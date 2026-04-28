@@ -1,0 +1,107 @@
+{
+ "add_total_row": 1,
+ "add_translate_data": 0,
+ "columns": [
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "label": "Employee",
+   "options": "User"
+  },
+  {
+   "fieldname": "employee_full_name",
+   "fieldtype": "Data",
+   "label": "Employee Name"
+  },
+  {
+   "fieldname": "leave_type",
+   "fieldtype": "Link",
+   "label": "Leave Type",
+   "options": "Leave Type"
+  },
+  {
+   "fieldname": "current_balance",
+   "fieldtype": "Float",
+   "label": "Current Balance"
+  },
+  {
+   "fieldname": "used_days",
+   "fieldtype": "Float",
+   "label": "Used Days"
+  },
+  {
+   "fieldname": "pending_days",
+   "fieldtype": "Float",
+   "label": "Pending Days"
+  },
+  {
+   "fieldname": "available_days",
+   "fieldtype": "Float",
+   "label": "Available Days"
+  },
+  {
+   "fieldname": "last_updated",
+   "fieldtype": "Date",
+   "label": "Last Updated"
+  }
+ ],
+ "creation": "2026-04-28 09:43:53.855974",
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "label": "Employee",
+   "options": "User"
+  },
+  {
+   "fieldname": "leave_type",
+   "fieldtype": "Link",
+   "label": "Leave Type",
+   "options": "Leave Type"
+  },
+  {
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+   "label": "From Date"
+  },
+  {
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+   "label": "To Date"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Approved\nPending\nRejected"
+  }
+ ],
+ "idx": 0,
+ "is_standard": "Yes",
+ "letter_head": null,
+ "modified": "2026-04-28 09:51:41.041717",
+ "modified_by": "Administrator",
+ "module": "Uotelafer Leave Management",
+ "name": "Employee Leaves Report",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "ref_doctype": "Leave Balance Transaction",
+ "reference_report": "",
+ "report_name": "Employee Leaves Report",
+ "report_type": "Script Report",
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "HR Manager"
+  },
+  {
+   "role": "HR User"
+  }
+ ],
+ "timeout": 0
+}

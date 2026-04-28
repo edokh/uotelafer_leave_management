@@ -1,0 +1,178 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "LV.#####",
+ "creation": "2026-04-09 15:37:14.570993",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "balance_message",
+  "section_break_ukzm",
+  "employee",
+  "employee_fullname",
+  "department",
+  "leave_type",
+  "from_date",
+  "to_date",
+  "days",
+  "status",
+  "column_break_fhww",
+  "alternative_employee",
+  "alternative_employee_fullname",
+  "date_of_application",
+  "supervisor",
+  "amended_from",
+  "section_break_tele",
+  "reason"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_ukzm",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Leave",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "from_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "From Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "days",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Days",
+   "read_only": 1
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason",
+   "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "date_of_application",
+   "fieldtype": "Date",
+   "label": "Date of Application"
+  },
+  {
+   "fetch_from": "department.admin_full_name",
+   "fieldname": "supervisor",
+   "fieldtype": "Data",
+   "label": "Supervisor",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fetch_from": "employee.full_name",
+   "fieldname": "employee_fullname",
+   "fieldtype": "Data",
+   "label": "Employee Fullname",
+   "read_only": 1
+  },
+  {
+   "fieldname": "to_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "To Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_fhww",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_tele",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fetch_from": "alrternative_employee.full_name",
+   "fieldname": "alternative_employee_fullname",
+   "fieldtype": "Data",
+   "label": "Alternative Employee Fullname",
+   "read_only": 1
+  },
+  {
+   "fieldname": "leave_type",
+   "fieldtype": "Link",
+   "label": "Leave Type",
+   "options": "Leave Type"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Draft\nPending\nApproved\nRejected",
+   "read_only": 1
+  },
+  {
+   "fieldname": "employee",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Employee",
+   "options": "User",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "employee.department",
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Department",
+   "options": "Departments2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "alternative_employee",
+   "fieldtype": "Link",
+   "label": "Alternative Employee",
+   "options": "User"
+  },
+  {
+   "fieldname": "balance_message",
+   "fieldtype": "HTML",
+   "width": "1"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-04-26 12:58:12.320389",
+ "modified_by": "Administrator",
+ "module": "Uotelafer Leave Management",
+ "name": "Leave",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

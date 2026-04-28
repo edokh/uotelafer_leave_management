@@ -1,0 +1,208 @@
+# Copyright (c) 2026, Computer Center of UoT and contributors
+# For license information, please see license.txt
+
+import frappe
+from frappe.model.document import Document
+from frappe import _
+from datetime import datetime, timedelta
+
+def get_permission_query_conditions(user):
+	print("Permission query conditions for user: {}".format(user))
+	frappe.logger().warning("Permission query conditions for user: {}".format(user))
+
+class Leave(Document):
+	def validate(self):
+		"""Validate and calculate leave days, excluding holidays and weekends"""
+		# Calculate days first (excluding holidays and weekends)
+		if self.from_date and self.to_date:
+			self.days = calculate_leave_days(self.from_date, self.to_date)
+		
+		# Validate that the employee has sufficient leave balance
+		if self.employee and self.leave_type and self.days:
+			# Get the leave balance for the selected leave type
+			balance_info = get_leave_balance(self.employee, self.leave_type, self.name)
+			total_balance = balance_info.get("total_balance", 0)
+			
+			# Check if balance is greater than 0
+			if total_balance <= 0:
+				frappe.throw(
+					_("Insufficient leave balance for {0}. Available balance: {1} days").format(
+						self.leave_type,
+						total_balance
+					)
+				)
+	
+	def before_submit(self):
+		"""Validate that status is not Rejected before submission"""
+		if self.status == "Rejected":
+			frappe.throw(_("Cannot submit a Rejected leave request"))
+
+@frappe.whitelist()
+def get_all_leave_balances(employee, current_leave_name=None):
+	"""
+	Get leave balance for all leave types for an employee.
+	Returns a dictionary with leave_type as key and balance as value.
+	Excludes the current leave being edited if current_leave_name is provided.
+	"""
+	if not employee:
+		return {}
+	
+	# Get all leave types
+	leave_types = frappe.get_all("Leave Type", fields=["name"])
+	
+	balances = {}
+	for leave_type_doc in leave_types:
+		leave_type = leave_type_doc.get("name")
+		
+		# Get all leave balance transactions for this employee and leave type
+		transactions = frappe.get_all(
+			"Leave Balance Transaction",
+			filters={
+				"employee": employee,
+				"leave_type": leave_type
+			},
+			fields=["transaction_type", "balance"]
+		)
+		
+		total_balance = 0
+		for transaction in transactions:
+			if transaction.get("transaction_type") == "Addition":
+				total_balance += transaction.get("balance", 0)
+			elif transaction.get("transaction_type") == "Consumption":
+				total_balance -= transaction.get("balance", 0)
+		
+		# Get all leave applications for this employee and leave type
+		filters = {
+			"employee": employee,
+			"leave_type": leave_type,
+		}
+		
+		# Exclude current leave if provided
+		if current_leave_name:
+			filters["name"] = ["!=", current_leave_name]
+		
+		leave_applications = frappe.get_all(
+			"Leave",
+			filters=filters,
+			fields=["days", "status", "name"]
+		)
+		
+		# Sum all days from leaves and subtract from balance
+		taken_days = 0
+		for application in leave_applications:
+			status = application.get("status")
+			# Count leaves that are not Rejected
+			if status != "Rejected":
+				taken_days += application.get("days", 0)
+		
+		total_balance -= taken_days
+		
+		# Always include all leave types, even with 0 balance
+		balances[leave_type] = total_balance
+	
+	return balances
+
+@frappe.whitelist()
+def get_leave_balance(employee, leave_type, current_leave_name=None):
+	"""
+	Calculate the leave balance for an employee for a specific leave type.
+	Excludes the current leave being edited if current_leave_name is provided.
+	"""
+	if not employee or not leave_type:
+		return {'total_balance': 0, 'applications': []}
+	
+	# Get all leave balance transactions for this employee and leave type
+	transactions = frappe.get_all(
+		"Leave Balance Transaction",
+		filters={
+			"employee": employee,
+			"leave_type": leave_type
+		},
+		fields=["transaction_type", "balance"]
+	)
+	
+	total_balance = 0
+	for transaction in transactions:
+		if transaction.get("transaction_type") == "Addition":
+			total_balance += transaction.get("balance", 0)
+		elif transaction.get("transaction_type") == "Consumption":
+			total_balance -= transaction.get("balance", 0)
+	
+	# Get all leave applications for this employee and leave type
+	filters = {
+		"employee": employee,
+		"leave_type": leave_type,
+	}
+	
+	# Exclude current leave if provided
+	if current_leave_name:
+		filters["name"] = ["!=", current_leave_name]
+	
+	leave_applications = frappe.get_all(
+		"Leave",
+		filters=filters,
+		fields=["days","status"]
+	)
+	
+	# Sum all days from leaves and subtract from balance
+	taken_days = 0
+	for application in leave_applications:
+		status = application.get("status")
+		# Count leaves that are not Rejected
+		if status != "Rejected":
+			taken_days += application.get("days", 0)
+	
+	total_balance -= taken_days
+	return {'total_balance': total_balance, 'applications': leave_applications}
+
+@frappe.whitelist()
+def calculate_leave_days(from_date, to_date):
+	"""
+	Calculate leave days excluding:
+	1. Fridays and Saturdays (weekends)
+	2. Holidays from Holiday DocType that fall within the date range
+	
+	Returns: Number of working days
+	"""
+	from frappe.utils import getdate
+	
+	from_date = getdate(from_date)
+	to_date = getdate(to_date)
+	
+	if from_date > to_date:
+		return 0
+	
+	# Get all holidays that fall within the date range
+	holidays = frappe.get_all(
+		"Holiday",
+		filters=[
+			["from_date", "<=", to_date],
+			["to_date", ">=", from_date]
+		],
+		fields=["from_date", "to_date"]
+	)
+	
+	# Create a set of holiday dates
+	holiday_dates = set()
+	for holiday in holidays:
+		current_date = getdate(holiday["from_date"])
+		holiday_end = getdate(holiday["to_date"])
+		while current_date <= holiday_end:
+			holiday_dates.add(current_date)
+			current_date += timedelta(days=1)
+	
+	# Count working days (excluding Friday=4, Saturday=5)
+	working_days = 0
+	current_date = from_date
+	
+	while current_date <= to_date:
+		# Check if it's not Friday (4) or Saturday (5) - Monday is 0
+		weekday = current_date.weekday()
+		
+		# If it's not a weekend and not a holiday, count it
+		if weekday not in [4, 5] and current_date not in holiday_dates:
+			working_days += 1
+		
+		current_date += timedelta(days=1)
+	
+	return working_days
