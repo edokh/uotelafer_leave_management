@@ -5,7 +5,7 @@ import frappe
 from frappe import _
 from frappe.utils import getdate
 from pypika import Order
-from pypika.functions import Sum, Max
+
 
 def execute(filters=None):
 	if not filters:
@@ -19,13 +19,13 @@ def execute(filters=None):
 
 def get_columns(filters):
 	columns = [
-		# {
-		# 	"label": _("Employee"),
-		# 	"fieldname": "employee",
-		# 	"fieldtype": "Link",
-		# 	"options": "User",
-		# 	"width": 100
-		# },
+		{
+			"label": _("Employee"),
+			"fieldname": "employee",
+			"fieldtype": "Link",
+			"options": "User",
+			"width": 100
+		},
 		{
 			"label": _("Employee Name"),
 			"fieldname": "employee_full_name",
@@ -40,7 +40,7 @@ def get_columns(filters):
 			"width": 120
 		},
 		{
-			"label": _("Total Balance"),
+			"label": _("Current Balance"),
 			"fieldname": "current_balance",
 			"fieldtype": "Float",
 			"width": 120
@@ -100,38 +100,33 @@ def get_data(filters):
 		"balance",
 		"date"
 	).orderby(frappe.qb.Field("date"), order=Order.desc).run(as_dict=True)
-
-	# Get all employee-leave_type balances
-	balance_records = query.select(
-		frappe.qb.Field("employee"),
-		frappe.qb.Field("employee_full_name"),
-		frappe.qb.Field("leave_type"),
-		Sum(frappe.qb.Field("balance")).as_("total_balance"),
-		Max(frappe.qb.Field("date")).as_("last_updated")
-	).groupby(
-		frappe.qb.Field("employee"),
-		frappe.qb.Field("leave_type")
-	).run(as_dict=True)
-
- 
-	for balance_record in balance_records:
+	
+	# Group by employee-leave_type to get latest records
+	employee_leave_dict = {}
+	for record in balance_records:
+		key = (record.get("employee"), record.get("leave_type"))
+		if key not in employee_leave_dict:
+			employee_leave_dict[key] = record
+	
+	# For each employee-leave_type combination, get usage stats
+	for key, balance_record in employee_leave_dict.items():
 		emp = balance_record.get("employee")
 		ltype = balance_record.get("leave_type")
-
+		
 		used_days = get_used_leaves(emp, ltype, from_date, to_date, status)
 		pending_days = get_pending_leaves(emp, ltype, from_date, to_date)
-		current_balance = balance_record.get("total_balance", 0) or 0
-		available_days = max(0, current_balance - pending_days-used_days)
-
+		current_balance = balance_record.get("balance", 0)
+		available_days = max(0, current_balance - pending_days)
+		
 		row = {
-			# "employee": emp,
-   			"employee_full_name": balance_record.get("employee_full_name"),
+			"employee": emp,
+			"employee_full_name": balance_record.get("employee_full_name"),
 			"leave_type": ltype,
 			"current_balance": current_balance,
 			"used_days": used_days,
 			"pending_days": pending_days,
 			"available_days": available_days,
-			"last_updated": balance_record.get("last_updated")
+			"last_updated": balance_record.get("date")
 		}
 		
 		data.append(row)
@@ -152,10 +147,10 @@ def get_used_leaves(employee, leave_type, from_date=None, to_date=None, status=N
 		query = query.where(frappe.qb.Field("status") == status)
 	else:
 		# By default, get only approved leaves
-		query = query.where(frappe.qb.Field("status") != "Rejected")
+		query = query.where(frappe.qb.Field("status").isin(["Approved", "Submitted"]))
 	
 	result = query.select(
-		Sum(frappe.qb.Field("days"))
+		frappe.qb.functions.Sum(frappe.qb.Field("days"))
 	).where(
 		frappe.qb.Field("employee") == employee
 	).where(
@@ -175,7 +170,7 @@ def get_pending_leaves(employee, leave_type, from_date=None, to_date=None):
 		query = query.where(frappe.qb.Field("to_date") <= getdate(to_date))
 	
 	result = query.select(
-		Sum(frappe.qb.Field("days"))
+		frappe.qb.functions.Sum(frappe.qb.Field("days"))
 	).where(
 		frappe.qb.Field("employee") == employee
 	).where(
