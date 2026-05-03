@@ -255,6 +255,10 @@ fixtures = [
     {
         "dt": "Workspace",
         "filters": [["name", "in", ["إجازات"]]]
+    },
+    {
+        "dt": "Workflow",
+        "filters": [["name", "in", ["Leave Approval"]]]
     }
 ]
 
