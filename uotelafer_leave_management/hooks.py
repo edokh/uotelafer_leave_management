@@ -251,6 +251,10 @@ fixtures = [
     {
         "dt": "Translation",
         "filters": [["language", "in", ["ar", "en"]]]
+    },
+    {
+        "dt": "Workspace",
+        "filters": [["name", "in", ["إجازات"]]]
     }
 ]
 

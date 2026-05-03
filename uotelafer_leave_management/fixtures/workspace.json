@@ -1,0 +1,46 @@
+[
+ {
+  "charts": [],
+  "content": "[{\"id\":\"JqPGxZUwNe\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">إجازات</span>\",\"col\":12}},{\"id\":\"q0Ypzx8cy8\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"إجازات\",\"col\":3}}]",
+  "custom_blocks": [],
+  "docstatus": 0,
+  "doctype": "Workspace",
+  "for_user": "",
+  "hide_custom": 0,
+  "icon": "image",
+  "indicator_color": "green",
+  "is_hidden": 0,
+  "label": "إجازات",
+  "links": [],
+  "modified": "2026-05-03 10:56:08.988136",
+  "module": "Uotelafer Leave Management",
+  "name": "إجازات",
+  "number_cards": [],
+  "parent_page": "",
+  "public": 1,
+  "quick_lists": [],
+  "restrict_to_domain": null,
+  "roles": [],
+  "sequence_id": 29.0,
+  "shortcuts": [
+   {
+    "color": "Grey",
+    "doc_view": "List",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "إجازات",
+    "link_to": "Leave",
+    "parent": "إجازات",
+    "parentfield": "shortcuts",
+    "parenttype": "Workspace",
+    "report_ref_doctype": null,
+    "restrict_to_domain": null,
+    "stats_filter": "[]",
+    "type": "DocType",
+    "url": null
+   }
+  ],
+  "title": "إجازات"
+ }
+]
