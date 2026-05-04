@@ -64,106 +64,73 @@ def get_data(filters):
 	leave_type = filters.get("leave_type")
 	from_date = filters.get("from_date")
 	to_date = filters.get("to_date")
-	status = filters.get("status")
 	
-	# Get all unique employee-leave_type combinations from Leave Balance Transaction
-	query = frappe.qb.from_("Leave Balance Transaction")
-	
+	# Fetch all Leave Balance Transactions
+	transaction_filters = {}
 	if employee:
-		query = query.where(frappe.qb.Field("employee") == employee)
+		transaction_filters["employee"] = employee
 	if leave_type:
-		query = query.where(frappe.qb.Field("leave_type") == leave_type)
+		transaction_filters["leave_type"] = leave_type
+	if from_date:
+		transaction_filters["date"] = [">=", from_date]
+	if to_date:
+		transaction_filters["date"] = ["<=", to_date]
 	
-	# Get latest balance transactions for each employee-leave_type combo
-	balance_records = query.select(
-		"employee",
-		"employee_full_name",
-		"leave_type",
-		"balance",
-		"date"
-	).orderby(frappe.qb.Field("date"), order=Order.desc).run(as_dict=True)
+	transactions = frappe.get_all("Leave Balance Transaction", 
+		filters=transaction_filters, 
+		fields=["employee", "employee_full_name", "leave_type", "transaction_type", "balance"]
+	)
 	
-	# Group by employee-leave_type to get unique employees and types
-	employee_leave_dict = {}
-	for record in balance_records:
-		key = (record.get("employee"), record.get("leave_type"))
-		if key not in employee_leave_dict:
-			employee_leave_dict[key] = {
-				"employee": record.get("employee"),
-				"employee_full_name": record.get("employee_full_name"),
-				"leave_type": record.get("leave_type")
+	# Group by employee and leave_type
+	emp_leave_map = {}
+	for t in transactions:
+		key = (t.employee, t.leave_type)
+		if key not in emp_leave_map:
+			emp_leave_map[key] = {
+				"employee_full_name": t.employee_full_name,
+				"addition": 0,
+				"consumption": 0
 			}
+		
+		if t.transaction_type == "Addition":
+			emp_leave_map[key]["addition"] += t.balance
+		elif t.transaction_type == "Consumption":
+			emp_leave_map[key]["consumption"] += t.balance
+			
+	# Fetch Pending Leaves
+	pending_filters = {"status": "Open"}
+	if employee:
+		pending_filters["employee"] = employee
+	if leave_type:
+		pending_filters["leave_type"] = leave_type
+	if from_date:
+		pending_filters["from_date"] = [">=", from_date]
+	if to_date:
+		pending_filters["to_date"] = ["<=", to_date]
+		
+	pending_leaves = frappe.get_all("Leave", filters=pending_filters, fields=["employee", "leave_type", "days"])
 	
-	from uotelafer_leave_management.uotelafer_leave_management.doctype.leave.leave import get_leave_balance
+	pending_map = {}
+	for p in pending_leaves:
+		key = (p.employee, p.leave_type)
+		if key not in pending_map:
+			pending_map[key] = 0
+		pending_map[key] += p.days
 
-	# For each employee-leave_type combination, get usage stats
-	for key, record in employee_leave_dict.items():
-		emp = record.get("employee")
-		ltype = record.get("leave_type")
+	for key, stats in emp_leave_map.items():
+		emp, ltype = key
+		used_days = stats["consumption"]
+		total_allocated = stats["addition"]
 		
-		used_days = get_used_leaves(emp, ltype, from_date, to_date, status)
-		pending_days = get_pending_leaves(emp, ltype, from_date, to_date)
+		pending_days = pending_map.get(key, 0)
+		available_days = total_allocated - used_days - pending_days
 		
-		# Get true available balance using the exact same logic as Leave doctype
-		balance_info = get_leave_balance(emp, ltype)
-		available_days = balance_info.get("total_balance", 0)
-		
-		row = {
-			"employee_full_name": record.get("employee_full_name"),
+		data.append({
+			"employee_full_name": stats["employee_full_name"],
 			"leave_type": ltype,
-			"used_days": used_days,
 			"pending_days": pending_days,
-			"available_days": available_days
-		}
-		
-		data.append(row)
-	
+			"available_days": available_days,
+			"used_days": used_days
+		})
+
 	return data
-
-
-def get_used_leaves(employee, leave_type, from_date=None, to_date=None, status=None):
-	"""Get count of used leaves for an employee and leave type"""
-	query = frappe.qb.from_("Leave")
-	
-	if from_date:
-		query = query.where(frappe.qb.Field("from_date") >= getdate(from_date))
-	if to_date:
-		query = query.where(frappe.qb.Field("to_date") <= getdate(to_date))
-	
-	if status:
-		query = query.where(frappe.qb.Field("status") == status)
-	else:
-		# By default, get only approved leaves
-		query = query.where(frappe.qb.Field("status").isin(["Approved", "Submitted"]))
-	
-	result = query.select(
-		Sum(frappe.qb.Field("days"))
-	).where(
-		frappe.qb.Field("employee") == employee
-	).where(
-		frappe.qb.Field("leave_type") == leave_type
-	).run()
-	
-	return result[0][0] or 0
-
-
-def get_pending_leaves(employee, leave_type, from_date=None, to_date=None):
-	"""Get count of pending leave applications"""
-	query = frappe.qb.from_("Leave")
-	
-	if from_date:
-		query = query.where(frappe.qb.Field("from_date") >= getdate(from_date))
-	if to_date:
-		query = query.where(frappe.qb.Field("to_date") <= getdate(to_date))
-	
-	result = query.select(
-		Sum(frappe.qb.Field("days"))
-	).where(
-		frappe.qb.Field("employee") == employee
-	).where(
-		frappe.qb.Field("leave_type") == leave_type
-	).where(
-		frappe.qb.Field("status") == "Open"
-	).run()
-	
-	return result[0][0] or 0
