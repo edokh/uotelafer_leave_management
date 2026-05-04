@@ -37,6 +37,24 @@ class Leave(Document):
 		if self.status == "Rejected":
 			frappe.throw(_("Cannot submit a Rejected leave request"))
 
+	def on_submit(self):
+		"""Create a Leave Balance Transaction of type Consumption after submission"""
+		if not self.days:
+			return
+
+		transaction = frappe.new_doc("Leave Balance Transaction")
+		transaction.employee = self.employee
+		transaction.leave_type = self.leave_type
+		transaction.transaction_type = "Consumption"
+		transaction.balance = self.days
+		transaction.date = frappe.utils.today()
+		transaction.note = f"Consumption from Leave {self.name}"
+		transaction.insert(ignore_permissions=True)
+		
+		frappe.msgprint(_("Leave Balance Transaction created for Consumption."))
+
+
+
 @frappe.whitelist()
 def get_all_leave_balances(employee, current_leave_name=None):
 	"""

@@ -5,6 +5,7 @@ import frappe
 from frappe import _
 from frappe.utils import getdate
 from pypika import Order
+from frappe.query_builder.functions import Sum
 
 
 def execute(filters=None):
@@ -150,7 +151,7 @@ def get_used_leaves(employee, leave_type, from_date=None, to_date=None, status=N
 		query = query.where(frappe.qb.Field("status").isin(["Approved", "Submitted"]))
 	
 	result = query.select(
-		frappe.qb.functions.Sum(frappe.qb.Field("days"))
+		Sum(frappe.qb.Field("days"))
 	).where(
 		frappe.qb.Field("employee") == employee
 	).where(
@@ -170,7 +171,7 @@ def get_pending_leaves(employee, leave_type, from_date=None, to_date=None):
 		query = query.where(frappe.qb.Field("to_date") <= getdate(to_date))
 	
 	result = query.select(
-		frappe.qb.functions.Sum(frappe.qb.Field("days"))
+		Sum(frappe.qb.Field("days"))
 	).where(
 		frappe.qb.Field("employee") == employee
 	).where(
