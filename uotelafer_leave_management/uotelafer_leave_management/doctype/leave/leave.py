@@ -7,8 +7,22 @@ from frappe import _
 from datetime import datetime, timedelta
 
 def get_permission_query_conditions(user):
-	print("Permission query conditions for user: {}".format(user))
-	frappe.logger().warning("Permission query conditions for user: {}".format(user))
+	if not user:
+		user = frappe.session.user
+
+	roles = frappe.get_roles(user)
+	if "System Manager" in roles:
+		return ""
+
+	if "Department Head" in roles:
+		departments = frappe.get_all("Leave Department", filters={"department_head": user}, pluck="name")
+		if departments:
+			departments_str = ", ".join([frappe.db.escape(d) for d in departments])
+			return f"`tabLeave`.department IN ({departments_str})"
+		else:
+			return "1=0"
+
+	return ""
 
 class Leave(Document):
 	def validate(self):
@@ -66,7 +80,7 @@ def get_all_leave_balances(employee, current_leave_name=None):
 		return {}
 	
 	# Get all leave types
-	leave_types = frappe.get_all("Leave Type", fields=["name"])
+	leave_types = frappe.get_all("Leave Type", filters={"has_balance": 1}, fields=["name"])
 	
 	balances = {}
 	for leave_type_doc in leave_types:

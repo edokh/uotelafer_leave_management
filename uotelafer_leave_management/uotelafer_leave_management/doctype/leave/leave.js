@@ -10,31 +10,16 @@ frappe.ui.form.on("Leave", {
 			frm.set_value("employee", frappe.session.user);
 		}
 
-		// Set filter for alternative employee based on department
-		set_alternative_employee_filter(frm);
 		// Show all leave balances when form loads
 		show_all_leave_balances(frm);
 	},
 
 	department(frm) {
-		// Update alternative employee filter when department changes
-		set_alternative_employee_filter(frm);
 		// Clear alternative employee when department changes
 		frm.set_value("alternative_employee", "");
 	},
 
-	leave_type(frm) {
-		// Show leave balance when leave type is selected
-		if (frm.doc.leave_type && frm.doc.employee) {
-			show_leave_balance(frm);
-		}
-	},
-
 	employee(frm) {
-		// Show leave balance when employee changes
-		if (frm.doc.leave_type && frm.doc.employee) {
-			show_leave_balance(frm);
-		}
 		// Show all leave balances
 		show_all_leave_balances(frm);
 	},
@@ -54,17 +39,6 @@ frappe.ui.form.on("Leave", {
 	},
 });
 
-function set_alternative_employee_filter(frm) {
-	if (frm.doc.department) {
-		frm.set_query("alternative_employee", function () {
-			return {
-				filters: {
-					"department": frm.doc.department
-				}
-			};
-		});
-	}
-}
 
 function show_leave_balance(frm) {
 	console.log('ayu how are you');
@@ -83,15 +57,17 @@ function show_leave_balance(frm) {
 
 				console.log(balance.applications);
 				
-				// Show message with leave balance
-				frappe.msgprint({
-					title: __("Leave Balance"),
-					indicator: balance.total_balance >= 0 ? "green" : "red",
-					message: __("Available leave balance for {0}: <b>{1}</b> days", [
-						leave_type,
-						balance.total_balance.toFixed(2)
-					])
-				});
+				// Only show message when there is no balance after selecting dates
+				if (balance.total_balance <= 0 || (frm.doc.days && balance.total_balance < frm.doc.days)) {
+					frappe.msgprint({
+						title: __("Leave Balance"),
+						indicator: "red",
+						message: __("Available leave balance for {0}: <b>{1}</b> days", [
+							leave_type,
+							balance.total_balance.toFixed(2)
+						])
+					});
+				}
 			}
 		}
 	});
@@ -139,6 +115,9 @@ function calculate_leave_days(frm) {
 			if (r.message !== undefined) {
 				frm.set_value("days", r.message);
 				console.log("Leave days calculated: " + r.message);
+				if (frm.doc.leave_type && frm.doc.employee) {
+					show_leave_balance(frm);
+				}
 			}
 		}
 	});

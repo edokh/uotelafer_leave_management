@@ -7,41 +7,35 @@
  "engine": "InnoDB",
  "field_order": [
   "employee",
-  "employee_fullname",
-  "selected"
+  "employee_fullname"
  ],
  "fields": [
   {
    "fieldname": "employee",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Employee",
-   "options": "User"
+   "options": "User",
+   "reqd": 1
   },
   {
    "fetch_from": "employee.full_name",
    "fieldname": "employee_fullname",
    "fieldtype": "Data",
-   "label": "Employee Fullname"
-  },
-  {
-   "default": "0",
-   "fieldname": "selected",
-   "fieldtype": "Check",
-   "label": "Selected"
+   "in_list_view": 1,
+   "label": "Employee Fullname",
+   "read_only": 1
   }
  ],
- "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-04-28 13:35:11.095084",
+ "modified": "2026-05-04 20:32:17.208654",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Bulk Leave Employee Row",
  "owner": "Administrator",
  "permissions": [],
- "row_format": "Dynamic",
- "rows_threshold_for_grid_search": 20,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []

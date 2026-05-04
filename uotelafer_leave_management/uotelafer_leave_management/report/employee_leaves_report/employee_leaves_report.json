@@ -1,48 +1,55 @@
 {
  "add_total_row": 1,
- "add_translate_data": 0,
  "columns": [
   {
    "fieldname": "employee",
    "fieldtype": "Link",
    "label": "Employee",
-   "options": "User"
+   "options": "User",
+   "width": 0
   },
   {
    "fieldname": "employee_full_name",
    "fieldtype": "Data",
-   "label": "Employee Name"
+   "label": "Employee Name",
+   "width": 0
   },
   {
    "fieldname": "leave_type",
    "fieldtype": "Link",
    "label": "Leave Type",
-   "options": "Leave Type"
+   "options": "Leave Type",
+   "width": 0
   },
   {
    "fieldname": "current_balance",
    "fieldtype": "Float",
-   "label": "Current Balance"
+   "label": "Current Balance",
+   "width": 0
   },
   {
    "fieldname": "used_days",
    "fieldtype": "Float",
-   "label": "Used Days"
+   "label": "Used Days",
+   "width": 0
   },
   {
    "fieldname": "pending_days",
    "fieldtype": "Float",
-   "label": "Pending Days"
+   "label": "Pending Days",
+   "width": 0
   },
   {
    "fieldname": "available_days",
    "fieldtype": "Float",
-   "label": "Available Days"
+   "label": "Available Days",
+   "width": 0
   },
   {
    "fieldname": "last_updated",
    "fieldtype": "Date",
-   "label": "Last Updated"
+   "label": "Last Updated",
+   "width": 0
   }
  ],
  "creation": "2026-04-28 09:43:53.855974",
@@ -54,35 +61,45 @@
    "fieldname": "employee",
    "fieldtype": "Link",
    "label": "Employee",
-   "options": "User"
+   "mandatory": 0,
+   "options": "User",
+   "wildcard_filter": 0
   },
   {
    "fieldname": "leave_type",
    "fieldtype": "Link",
    "label": "Leave Type",
-   "options": "Leave Type"
+   "mandatory": 0,
+   "options": "Leave Type",
+   "wildcard_filter": 0
   },
   {
    "fieldname": "from_date",
    "fieldtype": "Date",
-   "label": "From Date"
+   "label": "From Date",
+   "mandatory": 0,
+   "wildcard_filter": 0
   },
   {
    "fieldname": "to_date",
    "fieldtype": "Date",
-   "label": "To Date"
+   "label": "To Date",
+   "mandatory": 0,
+   "wildcard_filter": 0
   },
   {
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Status",
-   "options": "Approved\nPending\nRejected"
+   "mandatory": 0,
+   "options": "Approved\nPending\nRejected",
+   "wildcard_filter": 0
   }
  ],
  "idx": 0,
  "is_standard": "Yes",
- "letter_head": null,
- "modified": "2026-04-28 09:51:41.041717",
+ "letterhead": null,
+ "modified": "2026-05-04 20:42:47.946636",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Employee Leaves Report",
@@ -97,11 +114,10 @@
    "role": "System Manager"
   },
   {
-   "role": "HR Manager"
+   "role": "Follow Up Employee"
   },
   {
-   "role": "HR User"
+   "role": "HR Employee"
   }
- ],
- "timeout": 0
+ ]
 }

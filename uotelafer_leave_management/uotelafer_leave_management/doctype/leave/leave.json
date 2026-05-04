@@ -15,13 +15,13 @@
   "from_date",
   "to_date",
   "days",
-  "status",
   "column_break_fhww",
-  "alternative_employee",
-  "alternative_employee_fullname",
-  "date_of_application",
   "supervisor",
+  "alternative_employee",
+  "date_of_application",
+  "status",
   "amended_from",
+  "attachment",
   "section_break_tele",
   "reason"
  ],
@@ -67,14 +67,6 @@
    "label": "Date of Application"
   },
   {
-   "fetch_from": "department.admin_full_name",
-   "fieldname": "supervisor",
-   "fieldtype": "Data",
-   "label": "Supervisor",
-   "read_only": 1,
-   "reqd": 1
-  },
-  {
    "fetch_from": "employee.full_name",
    "fieldname": "employee_fullname",
    "fieldtype": "Data",
@@ -97,13 +89,6 @@
    "fieldtype": "Section Break"
   },
   {
-   "fetch_from": "alrternative_employee.full_name",
-   "fieldname": "alternative_employee_fullname",
-   "fieldtype": "Data",
-   "label": "Alternative Employee Fullname",
-   "read_only": 1
-  },
-  {
    "fieldname": "leave_type",
    "fieldtype": "Link",
    "label": "Leave Type",
@@ -122,15 +107,7 @@
    "in_list_view": 1,
    "label": "Employee",
    "options": "User",
-   "reqd": 1
-  },
-  {
-   "fetch_from": "employee.department",
-   "fieldname": "department",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Department",
-   "options": "Departments2",
+   "read_only": 1,
    "reqd": 1
   },
   {
@@ -143,13 +120,31 @@
    "fieldname": "balance_message",
    "fieldtype": "HTML",
    "width": "1"
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "label": "Department",
+   "options": "Leave Department"
+  },
+  {
+   "fetch_from": "department.department_head_name",
+   "fieldname": "supervisor",
+   "fieldtype": "Link",
+   "label": "Supervisor",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "attachment",
+   "fieldtype": "Attach",
+   "label": "Attachment"
   }
  ],
- "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-04-26 12:58:12.320389",
+ "modified": "2026-05-04 20:36:41.236913",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave",
@@ -168,10 +163,55 @@
    "share": 1,
    "submit": 1,
    "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "if_owner": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "University Employee",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "cancel": 1,
+   "delete": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Department Head",
+   "select": 1,
+   "share": 1,
+   "submit": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Follow Up Employee",
+   "select": 1,
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR Employee",
+   "select": 1,
+   "share": 1
   }
  ],
- "row_format": "Dynamic",
- "rows_threshold_for_grid_search": 20,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
