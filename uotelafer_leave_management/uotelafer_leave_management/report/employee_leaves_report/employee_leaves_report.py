@@ -21,13 +21,6 @@ def execute(filters=None):
 def get_columns(filters):
 	columns = [
 		{
-			"label": _("Employee"),
-			"fieldname": "employee",
-			"fieldtype": "Link",
-			"options": "User",
-			"width": 100
-		},
-		{
 			"label": _("Employee Name"),
 			"fieldname": "employee_full_name",
 			"fieldtype": "Data",
@@ -39,18 +32,6 @@ def get_columns(filters):
 			"fieldtype": "Link",
 			"options": "Leave Type",
 			"width": 120
-		},
-		{
-			"label": _("Current Balance"),
-			"fieldname": "current_balance",
-			"fieldtype": "Float",
-			"width": 120
-		},
-		{
-			"label": _("Used Days"),
-			"fieldname": "used_days",
-			"fieldtype": "Float",
-			"width": 100
 		},
 		{
 			"label": _("Pending Days"),
@@ -65,11 +46,11 @@ def get_columns(filters):
 			"width": 120
 		},
 		{
-			"label": _("Last Updated"),
-			"fieldname": "last_updated",
-			"fieldtype": "Date",
+			"label": _("Used Days"),
+			"fieldname": "used_days",
+			"fieldtype": "Float",
 			"width": 100
-		},
+		}
 	]
 	
 	return columns
@@ -102,32 +83,37 @@ def get_data(filters):
 		"date"
 	).orderby(frappe.qb.Field("date"), order=Order.desc).run(as_dict=True)
 	
-	# Group by employee-leave_type to get latest records
+	# Group by employee-leave_type to get unique employees and types
 	employee_leave_dict = {}
 	for record in balance_records:
 		key = (record.get("employee"), record.get("leave_type"))
 		if key not in employee_leave_dict:
-			employee_leave_dict[key] = record
+			employee_leave_dict[key] = {
+				"employee": record.get("employee"),
+				"employee_full_name": record.get("employee_full_name"),
+				"leave_type": record.get("leave_type")
+			}
 	
+	from uotelafer_leave_management.uotelafer_leave_management.doctype.leave.leave import get_leave_balance
+
 	# For each employee-leave_type combination, get usage stats
-	for key, balance_record in employee_leave_dict.items():
-		emp = balance_record.get("employee")
-		ltype = balance_record.get("leave_type")
+	for key, record in employee_leave_dict.items():
+		emp = record.get("employee")
+		ltype = record.get("leave_type")
 		
 		used_days = get_used_leaves(emp, ltype, from_date, to_date, status)
 		pending_days = get_pending_leaves(emp, ltype, from_date, to_date)
-		current_balance = balance_record.get("balance", 0)
-		available_days = max(0, current_balance - pending_days)
+		
+		# Get true available balance using the exact same logic as Leave doctype
+		balance_info = get_leave_balance(emp, ltype)
+		available_days = balance_info.get("total_balance", 0)
 		
 		row = {
-			"employee": emp,
-			"employee_full_name": balance_record.get("employee_full_name"),
+			"employee_full_name": record.get("employee_full_name"),
 			"leave_type": ltype,
-			"current_balance": current_balance,
 			"used_days": used_days,
 			"pending_days": pending_days,
-			"available_days": available_days,
-			"last_updated": balance_record.get("date")
+			"available_days": available_days
 		}
 		
 		data.append(row)
