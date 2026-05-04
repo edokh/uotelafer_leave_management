@@ -1,0 +1,42 @@
+[
+ {
+  "docstatus": 0,
+  "doctype": "Leave Type",
+  "has_balance": 1,
+  "leave_type": "اجازة اعتيادية",
+  "modified": "2026-05-04 20:18:51.328178",
+  "name": "اجازة اعتيادية"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Leave Type",
+  "has_balance": 1,
+  "leave_type": "اجازة مرضية",
+  "modified": "2026-05-04 20:18:52.629483",
+  "name": "اجازة مرضية"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Leave Type",
+  "has_balance": 0,
+  "leave_type": "اجازة بدون راتب",
+  "modified": "2026-05-04 20:13:33.065750",
+  "name": "اجازة بدون راتب"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Leave Type",
+  "has_balance": 0,
+  "leave_type": "تكليف",
+  "modified": "2026-05-04 20:13:44.219316",
+  "name": "تكليف"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Leave Type",
+  "has_balance": 0,
+  "leave_type": "ايفاد",
+  "modified": "2026-05-04 20:13:46.786412",
+  "name": "ايفاد"
+ }
+]

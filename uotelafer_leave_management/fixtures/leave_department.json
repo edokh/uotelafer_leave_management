@@ -1,0 +1,110 @@
+[
+ {
+  "department_head": null,
+  "department_head_name": null,
+  "department_name": "مركز التعليم المستمر",
+  "docstatus": 0,
+  "doctype": "Leave Department",
+  "modified": "2026-05-04 20:09:30.201824",
+  "name": "مركز التعليم المستمر"
+ },
+ {
+  "department_head": null,
+  "department_head_name": null,
+  "department_name": "الشؤون الادارية و المالية",
+  "docstatus": 0,
+  "doctype": "Leave Department",
+  "modified": "2026-05-04 20:09:39.667529",
+  "name": "الشؤون الادارية و المالية"
+ },
+ {
+  "department_head": null,
+  "department_head_name": null,
+  "department_name": "الموارد البشرية",
+  "docstatus": 0,
+  "doctype": "Leave Department",
+  "modified": "2026-05-04 20:09:45.978034",
+  "name": "الموارد البشرية"
+ },
+ {
+  "department_head": null,
+  "department_head_name": null,
+  "department_name": "قسم الاعلام",
+  "docstatus": 0,
+  "doctype": "Leave Department",
+  "modified": "2026-05-04 20:09:52.285435",
+  "name": "قسم الاعلام"
+ },
+ {
+  "department_head": null,
+  "department_head_name": null,
+  "department_name": "قسم المتابعة",
+  "docstatus": 0,
+  "doctype": "Leave Department",
+  "modified": "2026-05-04 20:10:01.144292",
+  "name": "قسم المتابعة"
+ },
+ {
+  "department_head": null,
+  "department_head_name": null,
+  "department_name": "قسم النشاطات الطلابية",
+  "docstatus": 0,
+  "doctype": "Leave Department",
+  "modified": "2026-05-04 20:10:18.499075",
+  "name": "قسم النشاطات الطلابية"
+ },
+ {
+  "department_head": null,
+  "department_head_name": null,
+  "department_name": "قسم الرقابة",
+  "docstatus": 0,
+  "doctype": "Leave Department",
+  "modified": "2026-05-04 20:10:22.660693",
+  "name": "قسم الرقابة"
+ },
+ {
+  "department_head": null,
+  "department_head_name": null,
+  "department_name": "قسم ضمان الجودة",
+  "docstatus": 0,
+  "doctype": "Leave Department",
+  "modified": "2026-05-04 20:10:30.413472",
+  "name": "قسم ضمان الجودة"
+ },
+ {
+  "department_head": null,
+  "department_head_name": null,
+  "department_name": "مركز الحاسبة",
+  "docstatus": 0,
+  "doctype": "Leave Department",
+  "modified": "2026-05-04 20:10:51.995989",
+  "name": "مركز الحاسبة"
+ },
+ {
+  "department_head": null,
+  "department_head_name": null,
+  "department_name": "البريد",
+  "docstatus": 0,
+  "doctype": "Leave Department",
+  "modified": "2026-05-04 20:11:08.489891",
+  "name": "البريد"
+ },
+ {
+  "department_head": null,
+  "department_head_name": null,
+  "department_name": "مساعد رئيس الجامعة للشؤون العلمية",
+  "docstatus": 0,
+  "doctype": "Leave Department",
+  "modified": "2026-05-04 20:11:24.273448",
+  "name": "مساعد رئيس الجامعة للشؤون العلمية"
+ },
+ {
+  "department_head": null,
+  "department_head_name": null,
+  "department_name": "مساعد رئيس الجامعة للشؤون الادارية",
+  "docstatus": 0,
+  "doctype": "Leave Department",
+  "modified": "2026-05-04 20:11:30.374091",
+  "name": "مساعد رئيس الجامعة للشؤون الادارية"
+ }
+]

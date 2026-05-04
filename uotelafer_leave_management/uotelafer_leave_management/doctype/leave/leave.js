@@ -20,6 +20,26 @@ frappe.ui.form.on("Leave", {
 	},
 
 	employee(frm) {
+		if (frm.doc.employee) {
+			frappe.db.get_value("Leave Employee", frm.doc.employee, ["full_name", "leave_department"])
+				.then(r => {
+					let values = r.message;
+					if (values && values.full_name) {
+						frm.set_value("employee_fullname", values.full_name);
+						if (values.leave_department && !frm.doc.department) {
+							frm.set_value("department", values.leave_department);
+						}
+					} else {
+						// Fallback to User full_name if Leave Employee doesn't exist yet
+						frappe.db.get_value("User", frm.doc.employee, "full_name")
+							.then(user_res => {
+								if (user_res && user_res.message) {
+									frm.set_value("employee_fullname", user_res.message.full_name);
+								}
+							});
+					}
+				});
+		}
 		// Show all leave balances
 		show_all_leave_balances(frm);
 	},

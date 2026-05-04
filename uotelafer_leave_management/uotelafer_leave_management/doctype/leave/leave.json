@@ -67,11 +67,9 @@
    "label": "Date of Application"
   },
   {
-   "fetch_from": "employee.full_name",
    "fieldname": "employee_fullname",
    "fieldtype": "Data",
-   "label": "Employee Fullname",
-   "read_only": 1
+   "label": "Employee Fullname"
   },
   {
    "fieldname": "to_date",
@@ -144,7 +142,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-04 20:36:41.236913",
+ "modified": "2026-05-04 22:27:51.204794",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave",

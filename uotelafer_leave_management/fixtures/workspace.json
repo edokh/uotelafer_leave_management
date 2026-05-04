@@ -1798,7 +1798,7 @@
  },
  {
   "charts": [],
-  "content": "[{\"id\":\"F_yJXvHulD\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"اضافة اجازة جديدة\",\"col\":12}},{\"id\":\"9NH93Tpf_U\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"قائمة الاجازات\",\"col\":12}}]",
+  "content": "[{\"id\":\"F_yJXvHulD\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"اضافة اجازة جديدة\",\"col\":2}},{\"id\":\"Ioyc41G7h8\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"اضافة الارصدة\",\"col\":3}},{\"id\":\"i70_teItb5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"تقرير الاجازات\",\"col\":3}},{\"id\":\"9NH93Tpf_U\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"قائمة الاجازات\",\"col\":12}}]",
   "custom_blocks": [
    {
     "custom_block_name": "اضافة اجازة جديدة",
@@ -1817,7 +1817,7 @@
   "is_hidden": 0,
   "label": "إجازات",
   "links": [],
-  "modified": "2026-05-04 20:22:06.676469",
+  "modified": "2026-05-04 20:42:31.678615",
   "module": "Uotelafer Leave Management",
   "name": "إجازات",
   "number_cards": [],
@@ -1843,7 +1843,40 @@
    }
   ],
   "sequence_id": 29.0,
-  "shortcuts": [],
+  "shortcuts": [
+   {
+    "color": "Grey",
+    "doc_view": "List",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "اضافة الارصدة",
+    "link_to": "Bulk Leave Balance Tool",
+    "parent": "إجازات",
+    "parentfield": "shortcuts",
+    "parenttype": "Workspace",
+    "restrict_to_domain": null,
+    "stats_filter": "[]",
+    "type": "DocType",
+    "url": null
+   },
+   {
+    "color": "Grey",
+    "doc_view": "List",
+    "format": null,
+    "icon": null,
+    "kanban_board": null,
+    "label": "تقرير الاجازات",
+    "link_to": "Employee Leaves Report",
+    "parent": "إجازات",
+    "parentfield": "shortcuts",
+    "parenttype": "Workspace",
+    "restrict_to_domain": null,
+    "stats_filter": null,
+    "type": "Report",
+    "url": null
+   }
+  ],
   "title": "إجازات"
  },
  {

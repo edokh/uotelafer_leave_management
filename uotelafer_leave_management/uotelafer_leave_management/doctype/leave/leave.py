@@ -25,6 +25,14 @@ def get_permission_query_conditions(user):
 	return ""
 
 class Leave(Document):
+	def before_insert(self):
+		if self.employee and not frappe.db.exists("Leave Employee", self.employee):
+			leave_employee = frappe.new_doc("Leave Employee")
+			leave_employee.user = self.employee
+			leave_employee.full_name = self.employee_fullname
+			leave_employee.leave_department = self.department
+			leave_employee.insert(ignore_permissions=True)
+
 	def validate(self):
 		"""Validate and calculate leave days, excluding holidays and weekends"""
 		# Calculate days first (excluding holidays and weekends)

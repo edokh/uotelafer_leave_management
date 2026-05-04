@@ -28,6 +28,12 @@ fixtures = [
     },
     {
         "dt": "Workflow Action"
+    },    
+    {
+        "dt": "Leave Type"
+    },
+    {
+        "dt": "Leave Department"
     },
     {
         "dt": "Role",
