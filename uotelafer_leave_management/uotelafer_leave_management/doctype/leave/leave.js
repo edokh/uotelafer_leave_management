@@ -1,8 +1,17 @@
 frappe.ui.form.on("Leave", {
 	onload(frm) {
-		// Set application date if new
-		if (frm.is_new() && !frm.doc.date_of_application) {
-			frm.set_value("date_of_application", frappe.datetime.nowdate());
+		if (frm.is_new()) {
+			if (!frm.doc.date_of_application) {
+				frm.set_value("date_of_application", frappe.datetime.nowdate());
+			}
+			
+			let next_day = frappe.datetime.add_days(frappe.datetime.nowdate(), 1);
+			if (!frm.doc.from_date) {
+				frm.set_value("from_date", next_day);
+			}
+			if (!frm.doc.to_date) {
+				frm.set_value("to_date", next_day);
+			}
 		}
 
 		// Auto-fill employee from current user
