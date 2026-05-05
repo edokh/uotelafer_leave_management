@@ -18,7 +18,7 @@ def get_permission_query_conditions(user):
 		departments = frappe.get_all("Leave Department", filters={"department_head": user}, pluck="name")
 		if departments:
 			departments_str = ", ".join([frappe.db.escape(d) for d in departments])
-			return f"`tabLeave`.department IN ({departments_str})"
+			return f"`tabLeave`.dep IN ({departments_str})"
 		else:
 			return "1=0"
 
@@ -27,12 +27,12 @@ def get_permission_query_conditions(user):
 class Leave(Document):
 	def before_insert(self):
 		if self.employee and not frappe.db.exists("Leave Employee", self.employee):
-			if not self.department:
+			if not self.dep:
 				frappe.throw(_("Department is required for your first leave application to setup your profile. Please select a Department."))
 			leave_employee = frappe.new_doc("Leave Employee")
 			leave_employee.user = self.employee
 			leave_employee.full_name = self.employee_fullname
-			leave_employee.leave_department = self.department
+			leave_employee.leave_department = self.dep
 			leave_employee.insert(ignore_permissions=True)
 
 	def validate(self):

@@ -14,8 +14,8 @@ frappe.ui.form.on("Leave", {
 		show_all_leave_balances(frm);
 	},
 
-	department(frm) {
-		// Clear alternative employee when department changes
+	dep(frm) {
+		// Clear alternative employee when dep changes
 		frm.set_value("alternative_employee", "");
 	},
 
@@ -26,8 +26,8 @@ frappe.ui.form.on("Leave", {
 					let values = r.message;
 					if (values && values.full_name) {
 						frm.set_value("employee_fullname", values.full_name);
-						if (values.leave_department && !frm.doc.department) {
-							frm.set_value("department", values.leave_department);
+						if (values.leave_department && !frm.doc.dep) {
+							frm.set_value("dep", values.leave_department);
 						}
 					} else {
 						// Fallback to User full_name if Leave Employee doesn't exist yet
