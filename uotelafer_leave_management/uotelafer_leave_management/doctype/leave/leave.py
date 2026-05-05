@@ -27,6 +27,8 @@ def get_permission_query_conditions(user):
 class Leave(Document):
 	def before_insert(self):
 		if self.employee and not frappe.db.exists("Leave Employee", self.employee):
+			if not self.department:
+				frappe.throw(_("Department is required for your first leave application to setup your profile. Please select a Department."))
 			leave_employee = frappe.new_doc("Leave Employee")
 			leave_employee.user = self.employee
 			leave_employee.full_name = self.employee_fullname
