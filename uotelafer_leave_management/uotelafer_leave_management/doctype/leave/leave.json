@@ -1,7 +1,7 @@
 {
  "actions": [],
  "allow_rename": 1,
- "autoname": "LV.#####",
+ "autoname": "naming_series:naming_series",
  "creation": "2026-04-09 15:37:14.570993",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -23,7 +23,8 @@
   "amended_from",
   "attachment",
   "section_break_tele",
-  "reason"
+  "reason",
+  "naming_series"
  ],
  "fields": [
   {
@@ -137,16 +138,23 @@
    "label": "Department",
    "options": "Leave Department",
    "reqd": 1
+  },
+  {
+   "default": "{employee_full_name}-{YYYY}{MM}{DD}-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Naming Series",
+   "options": "{employee_full_name}-{YYYY}{MM}{DD}-.#####"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-05 09:34:58.064867",
+ "modified": "2026-05-05 09:46:56.443674",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave",
- "naming_rule": "Expression",
+ "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
   {
