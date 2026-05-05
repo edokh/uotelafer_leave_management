@@ -15,13 +15,15 @@ fixtures = [
         "filters": [["language", "in", ["ar", "en"]]]
     },
     {
-        "dt": "Workspace"
+        "dt": "Workspace",
+        "filters": [["title", "=", "إجازات"]]
     },
     {
         "dt": "Workflow"
     },
     {
-        "dt": "Custom HTML Block"
+        "dt": "Custom HTML Block",
+        "filters": [["name", "=", "اضافة اجازة جديدة"]]
     },
     {
         "dt": "Workflow State"
