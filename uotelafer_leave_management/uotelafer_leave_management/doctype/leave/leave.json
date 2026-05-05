@@ -110,9 +110,8 @@
   },
   {
    "fieldname": "alternative_employee",
-   "fieldtype": "Link",
-   "label": "Alternative Employee",
-   "options": "User"
+   "fieldtype": "Data",
+   "label": "Alternative Employee"
   },
   {
    "fieldname": "balance_message",
@@ -142,7 +141,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-04 22:27:51.204794",
+ "modified": "2026-05-05 09:17:03.820714",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave",
@@ -210,6 +209,7 @@
    "share": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
