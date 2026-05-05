@@ -38,7 +38,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-04 22:24:30.807391",
+ "modified": "2026-05-05 09:02:21.760041",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave Employee",
@@ -56,8 +56,17 @@
    "role": "System Manager",
    "share": 1,
    "write": 1
+  },
+  {
+   "create": 1,
+   "if_owner": 1,
+   "read": 1,
+   "role": "University Employee",
+   "select": 1,
+   "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": []
