@@ -27,7 +27,7 @@ fixtures = [
         "dt": "Workflow State"
     },
     {
-        "dt": "Workflow Action"
+        "dt": "Workflow Action Master"
     },    
     {
         "dt": "Leave Type"
@@ -37,7 +37,7 @@ fixtures = [
     },
     {
         "dt": "Role",
-        "filters": [["name", "in", ["University Employee", "Department Head", "Follow Up Employee", "HR Employee"]]]
+        "filters": [["name", "in", ["University Employee", "University President", "Department Head", "Follow Up Employee", "HR Employee"]]]
     }
 ]
 
