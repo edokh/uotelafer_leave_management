@@ -1,6 +1,5 @@
 {
  "actions": [],
- "allow_rename": 1,
  "autoname": "employee_fullname.-.YY.-.MM.-.DD.-.##",
  "creation": "2026-04-09 15:37:14.570993",
  "doctype": "DocType",
@@ -142,7 +141,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-05 09:59:24.451206",
+ "modified": "2026-05-05 10:19:10.118001",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave",
