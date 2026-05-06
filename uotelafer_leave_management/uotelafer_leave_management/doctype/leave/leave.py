@@ -25,15 +25,24 @@ def get_permission_query_conditions(user):
 	return ""
 
 class Leave(Document):
-	def before_insert(self):
-		if self.employee and not frappe.db.exists("Leave Employee", self.employee):
+	def on_update(self):
+		if not self.employee:
+			return
+			
+		if not frappe.db.exists("Leave Employee", self.employee):
 			if not self.dep:
 				frappe.throw(_("Department is required for your first leave application to setup your profile. Please select a Department."))
 			leave_employee = frappe.new_doc("Leave Employee")
 			leave_employee.user = self.employee
+		else:
+			leave_employee = frappe.get_doc("Leave Employee", self.employee)
+			
+		if self.employee_fullname:
 			leave_employee.full_name = self.employee_fullname
+		if self.dep:
 			leave_employee.leave_department = self.dep
-			leave_employee.insert(ignore_permissions=True)
+			
+		leave_employee.save(ignore_permissions=True)
 
 	def validate(self):
 		"""Validate and calculate leave days, excluding holidays and weekends"""
@@ -41,20 +50,24 @@ class Leave(Document):
 		if self.from_date and self.to_date:
 			self.days = calculate_leave_days(self.from_date, self.to_date)
 		
-		# Validate that the employee has sufficient leave balance
+		# Validate that the employee has sufficient leave balance if the type requires it
 		if self.employee and self.leave_type and self.days:
-			# Get the leave balance for the selected leave type
-			balance_info = get_leave_balance(self.employee, self.leave_type, self.name)
-			total_balance = balance_info.get("total_balance", 0)
+			has_balance = frappe.db.get_value("Leave Type", self.leave_type, "has_balance")
 			
-			# Check if balance is greater than 0
-			if total_balance <= 0:
-				frappe.throw(
-					_("Insufficient leave balance for {0}. Available balance: {1} days").format(
-						self.leave_type,
-						total_balance
+			if has_balance:
+				# Get the leave balance for the selected leave type
+				balance_info = get_leave_balance(self.employee, self.leave_type, self.name)
+				total_balance = balance_info.get("total_balance", 0)
+				
+				# Check if balance is sufficient
+				if total_balance < self.days:
+					frappe.throw(
+						_("Insufficient leave balance for {0}. Requested: {1} days, Available: {2} days").format(
+							self.leave_type,
+							self.days,
+							total_balance
+						)
 					)
-				)
 	
 	def before_submit(self):
 		"""Validate that status is not Rejected before submission"""
@@ -64,6 +77,10 @@ class Leave(Document):
 	def on_submit(self):
 		"""Create a Leave Balance Transaction of type Consumption after submission"""
 		if not self.days:
+			return
+
+		has_balance = frappe.db.get_value("Leave Type", self.leave_type, "has_balance")
+		if not has_balance:
 			return
 
 		transaction = frappe.new_doc("Leave Balance Transaction")
@@ -201,10 +218,9 @@ def get_leave_balance(employee, leave_type, current_leave_name=None):
 def calculate_leave_days(from_date, to_date):
 	"""
 	Calculate leave days excluding:
-	1. Fridays and Saturdays (weekends)
-	2. Holidays from Holiday DocType that fall within the date range
+	1. Holidays from Holiday DocType that fall within the date range
 	
-	Returns: Number of working days
+	Returns: Number of leave days
 	"""
 	from frappe.utils import getdate
 	
@@ -233,16 +249,13 @@ def calculate_leave_days(from_date, to_date):
 			holiday_dates.add(current_date)
 			current_date += timedelta(days=1)
 	
-	# Count working days (excluding Friday=4, Saturday=5)
+	# Count days
 	working_days = 0
 	current_date = from_date
 	
 	while current_date <= to_date:
-		# Check if it's not Friday (4) or Saturday (5) - Monday is 0
-		weekday = current_date.weekday()
-		
-		# If it's not a weekend and not a holiday, count it
-		if weekday not in [4, 5] and current_date not in holiday_dates:
+		# If it's not a holiday, count it
+		if current_date not in holiday_dates:
 			working_days += 1
 		
 		current_date += timedelta(days=1)

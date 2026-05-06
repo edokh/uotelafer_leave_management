@@ -43,6 +43,7 @@
    "fieldname": "from_date",
    "fieldtype": "Date",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "From Date",
    "reqd": 1
   },
@@ -50,6 +51,7 @@
    "fieldname": "days",
    "fieldtype": "Int",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Days",
    "read_only": 1
   },
@@ -68,12 +70,15 @@
   {
    "fieldname": "employee_fullname",
    "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Employee Fullname"
   },
   {
    "fieldname": "to_date",
    "fieldtype": "Date",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "To Date",
    "reqd": 1
   },
@@ -88,12 +93,16 @@
   {
    "fieldname": "leave_type",
    "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Leave Type",
    "options": "Leave Type"
   },
   {
    "fieldname": "status",
    "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Status",
    "options": "Draft\nPending\nApproved\nRejected",
    "read_only": 1
@@ -128,11 +137,13 @@
   {
    "fieldname": "attachment",
    "fieldtype": "Attach",
-   "label": "Attachment"
+   "label": "\u0627\u0644\u0645\u0631\u0641\u0642\u0627\u062a"
   },
   {
    "fieldname": "dep",
    "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Department",
    "options": "Leave Department",
    "reqd": 1
@@ -141,7 +152,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-05 10:19:10.118001",
+ "modified": "2026-05-06 09:26:47.514536",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave",
@@ -210,7 +221,9 @@
   }
  ],
  "row_format": "Dynamic",
+ "search_fields": "employee_fullname",
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "employee_fullname"
 }
