@@ -8,6 +8,7 @@
   "balance_message",
   "section_break_ukzm",
   "employee",
+  "personal_email",
   "employee_fullname",
   "dep",
   "leave_type",
@@ -147,12 +148,17 @@
    "label": "Department",
    "options": "Leave Department",
    "reqd": 1
+  },
+  {
+   "fieldname": "personal_email",
+   "fieldtype": "Data",
+   "label": "Personal Email"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-07 11:15:24.485712",
+ "modified": "2026-05-07 11:25:42.207174",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave",

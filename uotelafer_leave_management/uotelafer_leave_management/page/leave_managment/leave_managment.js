@@ -33,6 +33,23 @@ class LeaveManagementPage {
 			}
 		} catch (e) {}
 
+		this.last_personal_email = "";
+		try {
+			let email_res = await frappe.call({
+				method: "frappe.client.get_list",
+				args: {
+					doctype: "Leave",
+					filters: { employee: frappe.session.user },
+					fields: ["personal_email"],
+					order_by: "creation desc",
+					limit_page_length: 1
+				}
+			});
+			if (email_res && email_res.message && email_res.message.length > 0 && email_res.message[0].personal_email) {
+				this.last_personal_email = email_res.message[0].personal_email;
+			}
+		} catch (e) {}
+
 		// Load departments and leave types for forms
 		let [dept_res, type_res, emp_res] = await Promise.all([
 			frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_departments" }),
@@ -445,6 +462,7 @@ class LeaveManagementPage {
 				{ fieldtype: 'Data', fieldname: 'employee_fullname', label: 'الاسم الكامل', reqd: 1, default: this.user_fullname },
 				{ fieldtype: 'Link', fieldname: 'leave_type', label: 'نوع الإجازة', options: 'Leave Type', reqd: 1, default: 'اجازة اعتيادية' },
 				{ fieldtype: 'Link', fieldname: 'dep', label: 'القسم', options: 'Leave Department', reqd: 1 },
+				{ fieldtype: 'Data', fieldname: 'personal_email', label: 'البريد الإلكتروني الشخصي', description: 'ايميل الاشعار', default: this.last_personal_email },
 				{ fieldtype: 'Column Break' },
 				{ fieldtype: 'Date', fieldname: 'from_date', label: 'من تاريخ', reqd: 1, default: frappe.datetime.add_days(frappe.datetime.nowdate(), 1), onchange: () => update_days() },
 				{ fieldtype: 'Date', fieldname: 'to_date', label: 'إلى تاريخ', reqd: 1, default: frappe.datetime.add_days(frappe.datetime.nowdate(), 1), onchange: () => update_days() },
@@ -467,7 +485,8 @@ class LeaveManagementPage {
 						reason: values.reason,
 						dep: values.dep,
 						alternative_employee: values.alternative_employee,
-						attachment: values.attachment
+						attachment: values.attachment,
+						personal_email: values.personal_email
 					},
 					freeze: true,
 					callback: (r) => {
