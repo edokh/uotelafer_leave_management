@@ -4,7 +4,7 @@
   "doctype": "Workflow",
   "document_type": "Leave",
   "is_active": 1,
-  "modified": "2026-05-05 08:46:57.342763",
+  "modified": "2026-05-05 10:18:56.079654",
   "name": "Leave Approval",
   "override_status": 0,
   "send_email_alert": 0,

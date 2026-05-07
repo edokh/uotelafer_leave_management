@@ -1,16 +1,8 @@
 [
  {
   "charts": [],
-  "content": "[{\"id\":\"F_yJXvHulD\",\"type\":\"custom_block\",\"data\":{\"custom_block_name\":\"اضافة اجازة جديدة\",\"col\":2}},{\"id\":\"Ioyc41G7h8\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"اضافة الارصدة\",\"col\":3}},{\"id\":\"i70_teItb5\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"تقرير الاجازات\",\"col\":3}},{\"id\":\"9NH93Tpf_U\",\"type\":\"quick_list\",\"data\":{\"quick_list_name\":\"قائمة الاجازات\",\"col\":12}}]",
-  "custom_blocks": [
-   {
-    "custom_block_name": "اضافة اجازة جديدة",
-    "label": "اضافة اجازة جديدة",
-    "parent": "إجازات",
-    "parentfield": "custom_blocks",
-    "parenttype": "Workspace"
-   }
-  ],
+  "content": "[{\"id\":\"Ioyc41G7h8\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"اضافة الارصدة\",\"col\":3}}]",
+  "custom_blocks": [],
   "docstatus": 0,
   "doctype": "Workspace",
   "for_user": "",
@@ -20,22 +12,13 @@
   "is_hidden": 0,
   "label": "إجازات",
   "links": [],
-  "modified": "2026-05-04 20:42:31.678615",
+  "modified": "2026-05-06 09:31:39.994488",
   "module": "Uotelafer Leave Management",
   "name": "إجازات",
   "number_cards": [],
   "parent_page": "",
   "public": 1,
-  "quick_lists": [
-   {
-    "document_type": "Leave",
-    "label": "قائمة الاجازات",
-    "parent": "إجازات",
-    "parentfield": "quick_lists",
-    "parenttype": "Workspace",
-    "quick_list_filter": "[]"
-   }
-  ],
+  "quick_lists": [],
   "restrict_to_domain": null,
   "roles": [
    {
@@ -62,23 +45,6 @@
     "restrict_to_domain": null,
     "stats_filter": "[]",
     "type": "DocType",
-    "url": null
-   },
-   {
-    "color": "Grey",
-    "doc_view": "List",
-    "format": null,
-    "icon": null,
-    "kanban_board": null,
-    "label": "تقرير الاجازات",
-    "link_to": "Employee Leaves Report",
-    "parent": "إجازات",
-    "parentfield": "shortcuts",
-    "parenttype": "Workspace",
-    "report_ref_doctype": "Leave Balance Transaction",
-    "restrict_to_domain": null,
-    "stats_filter": null,
-    "type": "Report",
     "url": null
    }
   ],

@@ -3,19 +3,19 @@
   "docstatus": 0,
   "doctype": "Workflow State",
   "icon": "",
-  "modified": "2026-05-04 20:23:01.909285",
-  "name": "Applied",
+  "modified": "2026-05-04 20:23:22.208451",
+  "name": "Submitted",
   "style": "",
-  "workflow_state_name": "Applied"
+  "workflow_state_name": "Submitted"
  },
  {
   "docstatus": 0,
   "doctype": "Workflow State",
   "icon": "",
-  "modified": "2026-05-04 20:23:22.208451",
-  "name": "Submitted",
+  "modified": "2026-05-04 20:23:01.909285",
+  "name": "Applied",
   "style": "",
-  "workflow_state_name": "Submitted"
+  "workflow_state_name": "Applied"
  },
  {
   "docstatus": 0,
@@ -38,19 +38,19 @@
  {
   "docstatus": 0,
   "doctype": "Workflow State",
-  "icon": "remove",
-  "modified": "2026-05-04 22:16:55.679173",
-  "name": "Rejected",
-  "style": "Danger",
-  "workflow_state_name": "Rejected"
- },
- {
-  "docstatus": 0,
-  "doctype": "Workflow State",
   "icon": "",
   "modified": "2026-05-05 08:44:06.283873",
   "name": "Approved By Department",
   "style": "",
   "workflow_state_name": "Approved By Department"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "remove",
+  "modified": "2026-05-04 22:16:55.679173",
+  "name": "Rejected",
+  "style": "Danger",
+  "workflow_state_name": "Rejected"
  }
 ]

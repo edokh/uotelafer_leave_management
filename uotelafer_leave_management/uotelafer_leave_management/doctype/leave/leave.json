@@ -127,7 +127,7 @@
    "width": "1"
   },
   {
-   "fetch_from": "department.department_head_name",
+   "fetch_from": "dep.department_head",
    "fieldname": "supervisor",
    "fieldtype": "Link",
    "label": "Supervisor",
@@ -152,7 +152,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-06 09:26:47.514536",
+ "modified": "2026-05-07 11:15:24.485712",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave",

@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
  "autoname": "field:department_name",
  "creation": "2026-05-04 20:00:03.745081",
@@ -33,7 +34,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-05 09:22:46.609348",
+ "modified": "2026-05-07 10:40:28.854766",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave Department",

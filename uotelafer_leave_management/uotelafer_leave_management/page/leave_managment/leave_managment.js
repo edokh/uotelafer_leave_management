@@ -34,12 +34,14 @@ class LeaveManagementPage {
 		} catch (e) {}
 
 		// Load departments and leave types for forms
-		let [dept_res, type_res] = await Promise.all([
+		let [dept_res, type_res, emp_res] = await Promise.all([
 			frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_departments" }),
-			frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_leave_types" })
+			frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_leave_types" }),
+			frappe.call({ method: "frappe.client.get_list", args: { doctype: "Leave Employee", fields: ["name", "full_name"], limit_page_length: 0 } })
 		]);
 		this.departments = dept_res.message || [];
 		this.leave_types = type_res.message || [];
+		this.leave_employees = emp_res.message || [];
 
 		// Determine default tab
 		if (this.user_roles.is_follow_up && !this.user_roles.is_employee && !this.user_roles.is_president && !this.user_roles.is_dept_head) {
@@ -88,14 +90,14 @@ class LeaveManagementPage {
 					</div>
 					<div class="lm-filter-group">
 						<label>القسم</label>
-						<select id="filter-dep">
+						<select id="filter-dep" style="max-width: 160px; text-overflow: ellipsis;">
 							<option value="">الكل</option>
 							${this.departments.map(d => `<option value="${d.name}">${d.department_name || d.name}</option>`).join('')}
 						</select>
 					</div>
 					<div class="lm-filter-group" id="emp-filter-wrapper">
 						<label>الموظف</label>
-						<!-- Frappe Control -->
+						<input type="text" id="filter-employee" placeholder="اختر الموظف..." autocomplete="off">
 					</div>
 					<div class="lm-filter-group">
 						<label>نوع الإجازة</label>
@@ -115,7 +117,7 @@ class LeaveManagementPage {
 							<option value="Rejected">مرفوضة</option>
 						</select>
 					</div>
-					<button class="lm-filter-btn" id="btn-filter">تصفية</button>
+					<button class="lm-filter-btn" id="btn-filter">تحديث</button>
 					<button class="lm-filter-clear" id="btn-clear-filter">مسح</button>
 				</div>
 
@@ -130,12 +132,10 @@ class LeaveManagementPage {
 								<th>الموظف</th>
 								<th>نوع الإجازة</th>
 								<th>من تاريخ</th>
-								<th>إلى تاريخ</th>
 								<th>الأيام</th>
 								<th>السبب</th>
 								<th>المرفقات</th>
 								<th>الحالة</th>
-								<th>تاريخ التقديم</th>
 								<th>القسم</th>
 								<th>الإجراءات</th>
 							</tr>
@@ -148,36 +148,18 @@ class LeaveManagementPage {
 			</div>
 		`);
 
-		this.employee_filter = frappe.ui.form.make_control({
-			parent: this.wrapper.find('#emp-filter-wrapper'),
-			df: {
-				fieldtype: 'Link',
-				options: 'Leave Employee',
-				fieldname: 'employee',
-				placeholder: 'اختر الموظف...',
-				only_select: true
-			},
-			render_input: true
-		});
-		
-		// Fix frappe control styling to match custom UI
-		this.employee_filter.$wrapper.removeClass('form-group');
-		this.employee_filter.$wrapper.css({'margin': '0', 'padding': '0'});
-		let $input = this.employee_filter.$wrapper.find('input');
-		$input.css({
-			'padding': '10px 14px',
-			'border': '1.5px solid var(--border-color, #e2e8f0)',
-			'border-radius': '10px',
-			'background': 'var(--control-bg, #f8fafc)',
-			'font-size': '15px',
-			'height': '44px',
-			'box-shadow': 'none',
-			'box-sizing': 'border-box',
-			'width': '100%'
-		});
-		
-		// Also remove any frappe label or help box that might have been rendered inside
-		this.employee_filter.$wrapper.find('.control-label, .help-box').hide();
+		let emp_input = this.wrapper.find('#filter-employee');
+		if (this.leave_employees && this.leave_employees.length > 0) {
+			let list = this.leave_employees.map(d => d.full_name || d.name);
+			new Awesomplete(emp_input[0], {
+				list: list,
+				minChars: 0,
+				maxItems: 15
+			});
+			emp_input[0].addEventListener("awesomplete-selectcomplete", () => {
+				this.load_data();
+			});
+		}
 
 		this.bind_events();
 		
@@ -246,7 +228,7 @@ class LeaveManagementPage {
 			this.wrapper.find('#filter-to-date').val('');
 			this.wrapper.find('#filter-leave-type').val('');
 			this.wrapper.find('#filter-dep').val('');
-			if(this.employee_filter) this.employee_filter.set_value('');
+			this.wrapper.find('#filter-employee').val('');
 
 			this.update_tab_ui();
 			this.load_data();
@@ -254,13 +236,20 @@ class LeaveManagementPage {
 	}
 
 	get_filters() {
+		let emp_val = this.wrapper.find('#filter-employee').val();
+		let emp_name = '';
+		if (emp_val) {
+			let matched = this.leave_employees ? this.leave_employees.find(d => (d.full_name || d.name) === emp_val) : null;
+			emp_name = matched ? matched.name : emp_val;
+		}
+
 		return {
 			from_date: this.wrapper.find('#filter-from-date').val(),
 			to_date: this.wrapper.find('#filter-to-date').val(),
 			leave_type: this.wrapper.find('#filter-leave-type').val(),
 			status: this.wrapper.find('#filter-status').val(),
 			dep: this.wrapper.find('#filter-dep').val(),
-			employee_name: this.employee_filter ? this.employee_filter.get_value() : ''
+			employee_name: emp_name
 		};
 	}
 
@@ -269,17 +258,15 @@ class LeaveManagementPage {
 		for (let i = 0; i < 5; i++) {
 			html += `
 				<tr class="lm-skeleton-row">
-					<td colspan="10">
+					<td colspan="9">
 						<div style="display:flex; gap:16px;">
 							<div class="lm-skeleton" style="flex:2"></div>
-							<div class="lm-skeleton" style="flex:1"></div>
 							<div class="lm-skeleton" style="flex:1"></div>
 							<div class="lm-skeleton" style="flex:1"></div>
 							<div class="lm-skeleton" style="flex:0.5"></div>
 							<div class="lm-skeleton" style="flex:2"></div>
 							<div class="lm-skeleton" style="flex:1"></div>
 							<div class="lm-skeleton" style="flex:1.5"></div>
-							<div class="lm-skeleton" style="flex:1"></div>
 							<div class="lm-skeleton" style="flex:1.5"></div>
 							<div class="lm-skeleton" style="flex:1"></div>
 						</div>
@@ -359,7 +346,7 @@ class LeaveManagementPage {
 		if (data.length === 0) {
 			tbody.html(`
 				<tr>
-					<td colspan="10">
+					<td colspan="9">
 						<div class="lm-empty">
 							<div class="empty-icon">📁</div>
 							<p>لا توجد بيانات لعرضها</p>
@@ -384,20 +371,14 @@ class LeaveManagementPage {
 					<td><b>${row.employee_fullname || row.employee}</b></td>
 					<td>${row.leave_type}</td>
 					<td>${row.from_date}</td>
-					<td>${row.to_date}</td>
 					<td><b>${row.days}</b></td>
 					<td style="max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${row.reason || ''}">${reason_text}</td>
 					<td>${attachment_btn}</td>
 					<td>${this.get_status_html(row.workflow_state)}</td>
-					<td>${row.date_of_application}</td>
 					<td>${row.dep || '-'}</td>
 					<td>
 						<div class="lm-actions">
-							${needs_action ? `
-								<button class="lm-action-btn approve" data-name="${row.name}">موافقة</button>
-								<button class="lm-action-btn reject" data-name="${row.name}">رفض</button>
-							` : ''}
-							<button class="lm-action-btn detail" data-name="${row.name}">التفاصيل</button>
+							<button class="lm-action-btn detail" data-name="${row.name}">إجراء</button>
 						</div>
 					</td>
 				</tr>
@@ -406,15 +387,6 @@ class LeaveManagementPage {
 			tr.find('.detail').on('click', () => {
 				this.show_details_dialog(row);
 			});
-
-			if (needs_action) {
-				tr.find('.approve').on('click', () => {
-					this.quick_action(row.name, 'Approve');
-				});
-				tr.find('.reject').on('click', () => {
-					this.quick_action(row.name, 'Reject');
-				});
-			}
 
 			tbody.append(tr);
 		});
