@@ -9,7 +9,8 @@
  "field_order": [
   "department_name",
   "department_head",
-  "department_head_name"
+  "department_head_name",
+  "department_head_personal_email"
  ],
  "fields": [
   {
@@ -30,11 +31,16 @@
    "fieldtype": "Data",
    "label": "Department Head Name",
    "read_only": 1
+  },
+  {
+   "fieldname": "department_head_personal_email",
+   "fieldtype": "Data",
+   "label": "Department Head Personal Email"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-07 10:40:28.854766",
+ "modified": "2026-05-07 11:41:30.771851",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave Department",

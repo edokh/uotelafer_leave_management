@@ -395,6 +395,7 @@ class LeaveManagementPage {
 					<td>${row.dep || '-'}</td>
 					<td>
 						<div class="lm-actions">
+							${this.current_tab === 'follow_up_leaves' ? `<button class="lm-action-btn print-pdf" data-name="${row.name}" style="background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; margin-left: 5px;">طباعة</button>` : ''}
 							<button class="lm-action-btn detail" data-name="${row.name}">إجراء</button>
 						</div>
 					</td>
@@ -404,6 +405,13 @@ class LeaveManagementPage {
 			tr.find('.detail').on('click', () => {
 				this.show_details_dialog(row);
 			});
+
+			if (this.current_tab === 'follow_up_leaves') {
+				tr.find('.print-pdf').on('click', () => {
+					let url = `/api/method/frappe.utils.print_format.download_pdf?doctype=Leave&name=${row.name}&format=Leave%20Print%20Form&no_letterhead=1&letterhead=No%20Letterhead&settings=%7B%7D&_lang=ar`;
+					window.open(url, '_blank');
+				});
+			}
 
 			tbody.append(tr);
 		});

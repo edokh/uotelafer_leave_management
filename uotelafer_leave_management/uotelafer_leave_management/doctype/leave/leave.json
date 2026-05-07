@@ -17,6 +17,7 @@
   "days",
   "column_break_fhww",
   "supervisor",
+  "supervisor_personal_email",
   "alternative_employee",
   "date_of_application",
   "status",
@@ -153,12 +154,18 @@
    "fieldname": "personal_email",
    "fieldtype": "Data",
    "label": "Personal Email"
+  },
+  {
+   "fetch_from": "dep.department_head_personal_email",
+   "fieldname": "supervisor_personal_email",
+   "fieldtype": "Data",
+   "label": "Supervisor Personal Email"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-07 11:25:42.207174",
+ "modified": "2026-05-07 11:43:00.467839",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave",
