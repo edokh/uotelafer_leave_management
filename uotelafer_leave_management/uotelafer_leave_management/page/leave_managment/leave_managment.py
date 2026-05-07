@@ -229,16 +229,17 @@ def get_leave_comments(leave_name):
 
 
 @frappe.whitelist()
-def create_leave(leave_type, from_date, to_date, reason, dep, alternative_employee=None, attachment=None):
+def create_leave(leave_type, from_date, to_date, reason, dep, employee_fullname=None, alternative_employee=None, attachment=None):
     """Create a new leave request and apply the workflow"""
     user = frappe.session.user
 
-    # Get employee full name
-    employee_fullname = frappe.db.get_value("User", user, "full_name") or user
-    # Try to get from Leave Employee first
-    le_name = frappe.db.get_value("Leave Employee", user, "full_name")
-    if le_name:
-        employee_fullname = le_name
+    if not employee_fullname:
+        # Get employee full name
+        employee_fullname = frappe.db.get_value("User", user, "full_name") or user
+        # Try to get from Leave Employee first
+        le_name = frappe.db.get_value("Leave Employee", user, "full_name")
+        if le_name:
+            employee_fullname = le_name
 
     doc = frappe.new_doc("Leave")
     doc.employee = user

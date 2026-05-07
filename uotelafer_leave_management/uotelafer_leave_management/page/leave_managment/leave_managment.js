@@ -11,6 +11,7 @@ class LeaveManagementPage {
 	constructor(wrapper) {
 		this.page = wrapper.page;
 		this.wrapper = $(wrapper).find('.layout-main-section');
+		$(wrapper).find('.page-head').hide();
 		this.user_roles = {};
 		this.current_tab = 'my_leaves';
 
@@ -23,6 +24,14 @@ class LeaveManagementPage {
 		// Fetch roles
 		let r = await frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_user_roles" });
 		this.user_roles = r.message || {};
+
+		this.user_fullname = frappe.session.user_fullname;
+		try {
+			let u_res = await frappe.db.get_value("Leave Employee", frappe.session.user, "full_name");
+			if (u_res && u_res.message && u_res.message.full_name) {
+				this.user_fullname = u_res.message.full_name;
+			}
+		} catch (e) {}
 
 		// Load departments and leave types for forms
 		let [dept_res, type_res] = await Promise.all([
@@ -143,7 +152,7 @@ class LeaveManagementPage {
 			parent: this.wrapper.find('#emp-filter-wrapper'),
 			df: {
 				fieldtype: 'Link',
-				options: 'User',
+				options: 'Leave Employee',
 				fieldname: 'employee',
 				placeholder: 'اختر الموظف...',
 				only_select: true
@@ -152,18 +161,19 @@ class LeaveManagementPage {
 		});
 		
 		// Fix frappe control styling to match custom UI
-		this.employee_filter.$wrapper.removeClass('form-group frappe-control');
+		this.employee_filter.$wrapper.removeClass('form-group');
 		this.employee_filter.$wrapper.css({'margin': '0', 'padding': '0'});
 		let $input = this.employee_filter.$wrapper.find('input');
 		$input.css({
 			'padding': '10px 14px',
-			'border': '1.5px solid var(--border-color)',
+			'border': '1.5px solid var(--border-color, #e2e8f0)',
 			'border-radius': '10px',
-			'background': 'var(--control-bg)',
+			'background': 'var(--control-bg, #f8fafc)',
 			'font-size': '15px',
 			'height': '44px',
 			'box-shadow': 'none',
-			'box-sizing': 'border-box'
+			'box-sizing': 'border-box',
+			'width': '100%'
 		});
 		
 		// Also remove any frappe label or help box that might have been rendered inside
@@ -460,7 +470,8 @@ class LeaveManagementPage {
 		dialog = new frappe.ui.Dialog({
 			title: 'تقديم إجازة جديدة',
 			fields: [
-				{ fieldtype: 'Link', fieldname: 'leave_type', label: 'نوع الإجازة', options: 'Leave Type', reqd: 1 },
+				{ fieldtype: 'Data', fieldname: 'employee_fullname', label: 'الاسم الكامل', reqd: 1, default: this.user_fullname },
+				{ fieldtype: 'Link', fieldname: 'leave_type', label: 'نوع الإجازة', options: 'Leave Type', reqd: 1, default: 'اجازة اعتيادية' },
 				{ fieldtype: 'Link', fieldname: 'dep', label: 'القسم', options: 'Leave Department', reqd: 1 },
 				{ fieldtype: 'Column Break' },
 				{ fieldtype: 'Date', fieldname: 'from_date', label: 'من تاريخ', reqd: 1, default: frappe.datetime.add_days(frappe.datetime.nowdate(), 1), onchange: () => update_days() },
@@ -477,6 +488,7 @@ class LeaveManagementPage {
 				frappe.call({
 					method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.create_leave',
 					args: {
+						employee_fullname: values.employee_fullname,
 						leave_type: values.leave_type,
 						from_date: values.from_date,
 						to_date: values.to_date,
