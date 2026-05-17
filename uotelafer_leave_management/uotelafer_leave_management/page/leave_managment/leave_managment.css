@@ -569,8 +569,19 @@
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
     .lm-header { flex-direction: column; align-items: stretch; }
-    .lm-filters { flex-direction: column; }
-    .lm-filter-group input, .lm-filter-group select { min-width: 100%; }
+    .lm-filters { 
+        display: grid; 
+        grid-template-columns: 1fr 1fr; 
+        gap: 12px; 
+        align-items: end;
+    }
+    .lm-filter-group { width: 100%; }
+    .lm-filter-group input, .lm-filter-group select { 
+        width: 100%; 
+        min-width: 100%; 
+    }
+    .lm-filter-btn, .lm-filter-clear { width: 100%; }
+    
     .lm-detail-grid { grid-template-columns: 1fr; }
     .lm-field-row { flex-direction: column; gap: 0; }
     .lm-stat-card { min-width: 100px; }
