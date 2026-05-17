@@ -1,0 +1,281 @@
+<div dir="rtl" style="
+    border:1px solid black;
+    padding:8px;
+    font-family:Tahoma;
+    font-size:11px;
+    width:100%;
+">
+
+    <!-- Header -->
+    <table style="width:100%; border-collapse:collapse; margin-bottom:5px;">
+        <tr>
+            <td style="text-align:center;">
+                <div style="font-weight:bold;">جامعة تلعفر</div>
+                <div style="font-weight:bold; margin-top:3px;">
+                    نموذج طلب إجازة خاصة بالموظفين
+                </div>
+            </td>
+            <td style="width:50%;"></td>
+            <td style="width:15%; text-align:left;">
+                <img src="/files/398187124_832924115292771_8632611931367621524_n.png" style="height:5rem;">
+            </td>
+        </tr>
+    </table>
+
+
+    <!-- Instructions -->
+    <table style="width:100%; border-collapse:collapse; margin-bottom:5px;">
+        <tr>
+            <td colspan="4" style="
+                border:1px solid black;
+                text-align:center;
+                padding:8px;
+            ">
+                يتم اهمال نموذج طلب الاجازة في حال عدم اكمال اجراءات النموذج بصورة صحيحة حسب التعليمات المتبثة على
+                النموذج
+            </td>
+        </tr>
+        <tr>
+
+            <!-- Right box -->
+            <td style="
+                width:30%;
+                border:1px solid black;
+                text-align:center;
+                vertical-align:middle;
+                font-weight:bold;
+                padding:10px;
+            ">
+                تعليمات التقديم للحصول على الإجازة
+            </td>
+
+            <!-- Left box -->
+            <td style="
+                border:1px solid black;
+                padding:6px;
+                line-height:1.8;
+            ">
+                1- يتم تقديم الطلب حسب التعليمات أعلاه.
+                <br>
+                2- يعتمد من المسؤول المباشر.
+                <br>
+                3- يتم تنظيم الأوليات بشكل واضح.
+                <br>
+                4- يرفع إلى شعبة الموارد البشرية.
+                <br>
+                5- يحق للموظف متابعة الطلب.
+            </td>
+
+        </tr>
+    </table>
+
+
+
+    <!-- Employee Info -->
+    <table style="width:100%; border-collapse:collapse; margin-bottom:5px;">
+
+        <tr>
+            <td colspan="4" style="
+                border:1px solid black;
+                text-align:center;
+                font-weight:bold;
+                padding:4px;
+            ">
+                بيانات الموظف \ـة
+            </td>
+        </tr>
+
+        <tr>
+            <td style="border:1px solid black; padding:4px;">اسم الموظف</td>
+            <td style="border:1px solid black; padding:4px;">
+                {{ doc.leave_employee }}
+            </td>
+
+            <td style="border:1px solid black; padding:4px;">القسم</td>
+            <td style="border:1px solid black; padding:4px;">
+                {{ doc.dep }}
+            </td>
+        </tr>
+
+        <tr>
+
+            <td style="border:1px solid black; padding:4px;">نوع الإجازة</td>
+            <td style="border:1px solid black; padding:4px;">
+                {{ frappe.db.get_value("Leave Type", doc.leave_type, "leave_type") }}
+            </td>
+            <td style="border:1px solid black; padding:4px;">مدة الإجازة</td>
+            <td style="border:1px solid black; padding:4px;">
+                {{ doc.days }}
+            </td>
+        </tr>
+
+        <tr>
+            <td style="border:1px solid black; padding:4px;">من تاريخ</td>
+            <td style="border:1px solid black; padding:4px;">
+                {{ doc.from_date }}
+            </td>
+
+            <td style="border:1px solid black; padding:4px;">إلى تاريخ</td>
+            <td style="border:1px solid black; padding:4px;">
+                {{ doc.to_date }}
+            </td>
+        </tr>
+        <tr>
+            <td style="border:1px solid black; padding:4px;">
+                سبب الإجازة
+            </td>
+            <td style="border:1px solid black; padding:4px;" colspan="3">
+                {{ doc.reason}}
+            </td>
+        </tr>
+        <tr>
+            <td style="border:1px solid black; padding:4px;">
+                اسم الموظف الثلاثي البديل
+            </td>
+            <td style="border:1px solid black; padding:4px;" colspan="3">
+                {{doc.alternative_employee}}
+            </td>
+        </tr>
+    </table>
+
+
+
+    <!-- Applicant -->
+    <table style="width:100%; border-collapse:collapse; margin-bottom:5px;">
+
+        <tr>
+            <td colspan="4" style="
+                border:1px solid black;
+                text-align:center;
+                font-weight:bold;
+                padding:4px;
+            ">
+                بيانات مقدم الطلب
+            </td>
+        </tr>
+
+        <tr>
+            <td style="border:1px solid black; padding:4px;">اسم مقدم الطلب</td>
+            <td style="border:1px solid black; padding:4px; width:25%;">
+
+            </td>
+
+            <td style="border:1px solid black; padding:4px;" rowspan="2">توقيع مقدم الطلب</td>
+            <td style="border:1px solid black; padding:4px; width:25%;" rowspan="2">
+
+            </td>
+        </tr>
+        <tr>
+            <td style="border:1px solid black; padding:4px;">تاريخ مقدم الطلب</td>
+            <td style="border:1px solid black; padding:4px; width:25%;">
+                {{ doc.get_formatted("creation") }}
+            </td>
+        </tr>
+    </table>
+
+
+
+    <!-- Leave balances -->
+    <table style="width:100%; border-collapse:collapse; margin-bottom:5px;">
+
+        <tr>
+            <td colspan="2" style="
+                border:1px solid black;
+                text-align:center;
+                font-weight:bold;
+                padding:4px;
+            ">
+                الموارد البشرية
+            </td>
+        </tr>
+
+        <tr>
+            <td style="
+                border:1px solid black;
+                height:70px;
+                padding:4px;
+            ">
+                الإجازات المتراكمة: {{ doc.leaves_after_submission }}
+                <br><br>
+                الإجازات خلال الشهر: {{ doc.this_month_accepted_leaves }}
+                <br><br>
+                الإجازات الزمنية خلال الشهر:
+            </td>
+
+            <td style="
+                border:1px solid black;
+                height:70px;
+                padding:4px;
+              width:50%
+            ">
+
+                الاجازات المرضية:
+                <br /><br />
+                الاجازات المرضية خلال الشهر:
+            </td>
+        </tr>
+
+    </table>
+
+
+
+    <!-- Signatures -->
+    <table style="width:100%; border-collapse:collapse;">
+        <tr>
+            <td colspan="2" style="
+                border:1px solid black;
+                text-align:center;
+                font-weight:bold;
+                padding:4px;
+            ">
+                الموافقات الرسمية
+            </td>
+        </tr>
+        <tr>
+
+            <td style="
+                border:1px solid black;
+                text-align:center;
+                padding:5px;
+            ">
+                المسؤول المباشر على الإجازة
+            </td>
+            <td style="
+                border:1px solid black;
+                text-align:center;
+                padding:5px;
+                width:50%;
+            ">
+                قسم شؤون الديوان
+            </td>
+
+        </tr>
+        <tr>
+
+            <td style="
+                border:1px solid black;
+                height:65px;
+                vertical-align:top;
+                padding-top:5px;
+            ">
+                التوقيع:
+                <br><br>
+                الأسم: {{ doc.supervisor or "" }}
+                <br><br>
+                التأريخ:
+            </td>
+            <td style="
+                border:1px solid black;
+                text-align:center;
+                height:65px;
+                vertical-align:top;
+                padding-top:5px;
+                width:50%;
+            ">
+            </td>
+
+        </tr>
+
+    </table>
+
+</div>

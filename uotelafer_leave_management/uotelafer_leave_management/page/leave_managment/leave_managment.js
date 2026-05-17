@@ -34,19 +34,22 @@ class LeaveManagementPage {
 		} catch (e) {}
 
 		this.last_personal_email = "";
+		this.last_dep = "";
 		try {
-			let email_res = await frappe.call({
+			let last_leave_res = await frappe.call({
 				method: "frappe.client.get_list",
 				args: {
 					doctype: "Leave",
 					filters: { employee: frappe.session.user },
-					fields: ["personal_email"],
+					fields: ["personal_email", "dep"],
 					order_by: "creation desc",
 					limit_page_length: 1
 				}
 			});
-			if (email_res && email_res.message && email_res.message.length > 0 && email_res.message[0].personal_email) {
-				this.last_personal_email = email_res.message[0].personal_email;
+			if (last_leave_res && last_leave_res.message && last_leave_res.message.length > 0) {
+				let last_doc = last_leave_res.message[0];
+				if (last_doc.personal_email) this.last_personal_email = last_doc.personal_email;
+				if (last_doc.dep) this.last_dep = last_doc.dep;
 			}
 		} catch (e) {}
 
@@ -397,6 +400,7 @@ class LeaveManagementPage {
 						<div class="lm-actions">
 							${this.current_tab === 'follow_up_leaves' ? `<button class="lm-action-btn print-pdf" data-name="${row.name}" style="background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; margin-left: 5px;">طباعة</button>` : ''}
 							<button class="lm-action-btn detail" data-name="${row.name}">إجراء</button>
+							<button class="lm-action-btn delete-btn" data-name="${row.name}" style="background-color: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; margin-right: 5px;">حذف</button>
 						</div>
 					</td>
 				</tr>
@@ -404,6 +408,24 @@ class LeaveManagementPage {
 
 			tr.find('.detail').on('click', () => {
 				this.show_details_dialog(row);
+			});
+
+			tr.find('.delete-btn').on('click', () => {
+				frappe.confirm('هل أنت متأكد من حذف هذه الإجازة؟', () => {
+					frappe.call({
+						method: 'frappe.client.delete',
+						args: {
+							doctype: 'Leave',
+							name: row.name
+						},
+						callback: (r) => {
+							if (!r.exc) {
+								frappe.show_alert({ message: 'تم حذف الإجازة بنجاح', indicator: 'green' });
+								this.load_data();
+							}
+						}
+					});
+				});
 			});
 
 			if (this.current_tab === 'follow_up_leaves') {
@@ -469,7 +491,7 @@ class LeaveManagementPage {
 			fields: [
 				{ fieldtype: 'Data', fieldname: 'employee_fullname', label: 'الاسم الكامل', reqd: 1, default: this.user_fullname },
 				{ fieldtype: 'Link', fieldname: 'leave_type', label: 'نوع الإجازة', options: 'Leave Type', reqd: 1, default: 'اجازة اعتيادية' },
-				{ fieldtype: 'Link', fieldname: 'dep', label: 'القسم', options: 'Leave Department', reqd: 1 },
+				{ fieldtype: 'Link', fieldname: 'dep', label: 'القسم', options: 'Leave Department', reqd: 1, default: this.last_dep },
 				{ fieldtype: 'Data', fieldname: 'personal_email', label: 'البريد الإلكتروني الشخصي', description: 'ايميل الاشعار', default: this.last_personal_email },
 				{ fieldtype: 'Column Break' },
 				{ fieldtype: 'Date', fieldname: 'from_date', label: 'من تاريخ', reqd: 1, default: frappe.datetime.add_days(frappe.datetime.nowdate(), 1), onchange: () => update_days() },

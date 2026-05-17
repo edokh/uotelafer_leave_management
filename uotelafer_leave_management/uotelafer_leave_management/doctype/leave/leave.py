@@ -29,13 +29,14 @@ class Leave(Document):
 		if not self.employee:
 			return
 			
-		if not frappe.db.exists("Leave Employee", self.employee):
+		leave_employee_name = frappe.db.get_value("Leave Employee", {"user": self.employee}, "name")
+		if not leave_employee_name:
 			if not self.dep:
 				frappe.throw(_("Department is required for your first leave application to setup your profile. Please select a Department."))
 			leave_employee = frappe.new_doc("Leave Employee")
 			leave_employee.user = self.employee
 		else:
-			leave_employee = frappe.get_doc("Leave Employee", self.employee)
+			leave_employee = frappe.get_doc("Leave Employee", leave_employee_name)
 			
 		if self.employee_fullname:
 			leave_employee.full_name = self.employee_fullname
