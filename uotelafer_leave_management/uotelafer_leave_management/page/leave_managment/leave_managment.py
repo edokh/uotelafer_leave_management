@@ -62,11 +62,8 @@ def get_department_leaves(from_date=None, to_date=None, leave_type=None, status=
         filters["to_date"] = ["<=", to_date]
     if leave_type:
         filters["leave_type"] = leave_type
-    if status:
+    if status and status != "All":
         filters["workflow_state"] = status
-    else:
-        # Default: show Applied leaves for department head
-        filters["workflow_state"] = "Applied"
 
     leaves = frappe.get_all(
         "Leave",
@@ -101,11 +98,8 @@ def get_president_leaves(from_date=None, to_date=None, leave_type=None, status=N
         filters["to_date"] = ["<=", to_date]
     if leave_type:
         filters["leave_type"] = leave_type
-    if status:
+    if status and status != "All":
         filters["workflow_state"] = status
-    else:
-        # Default: show leaves approved by department, awaiting president
-        filters["workflow_state"] = "Approved By Department"
 
     leaves = frappe.get_all(
         "Leave",
@@ -202,9 +196,13 @@ def get_user_roles():
     """Get current user's roles relevant to this page"""
     user = frappe.session.user
     roles = frappe.get_roles(user)
+    is_dept_head = False
+    if "Department Head" in roles:
+        is_dept_head = bool(frappe.db.exists("Leave Department", {"department_head": user}))
+
     return {
         "is_employee": "University Employee" in roles,
-        "is_dept_head": "Department Head" in roles,
+        "is_dept_head": is_dept_head,
         "is_president": "University President" in roles,
         "is_follow_up": "Follow Up Employee" in roles,
         "is_admin": "System Manager" in roles,

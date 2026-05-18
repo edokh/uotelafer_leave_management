@@ -45,6 +45,15 @@ class Leave(Document):
 			
 		leave_employee.save(ignore_permissions=True)
 
+	def before_save(self):
+		if not self.is_new():
+			old_doc = self.get_doc_before_save()
+			if old_doc and old_doc.workflow_state != self.workflow_state:
+				if self.workflow_state == "Approved By Department" or (old_doc.workflow_state == "Applied" and self.workflow_state == "Rejected"):
+					self.date_of_supervisor_action = frappe.utils.today()
+				elif self.workflow_state == "Approved" or (old_doc.workflow_state == "Approved By Department" and self.workflow_state == "Rejected"):
+					self.date_of_presidant_action = frappe.utils.today()
+
 	def validate(self):
 		"""Validate and calculate leave days, excluding holidays and weekends"""
 		# Calculate days first (excluding holidays and weekends)
