@@ -15,8 +15,7 @@ fixtures = [
         "filters": [["language", "in", ["ar", "en"]]]
     },
     {
-        "dt": "Workspace",
-        "filters": [["title", "=", "إجازات"]]
+        "dt": "Workspace"
     },
     {
         "dt": "Workflow"

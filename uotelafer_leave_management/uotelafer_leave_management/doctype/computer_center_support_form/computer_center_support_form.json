@@ -1,0 +1,45 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-05-18 12:30:19.703604",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "type_of_request"
+ ],
+ "fields": [
+  {
+   "fieldname": "type_of_request",
+   "fieldtype": "Select",
+   "label": "\u0646\u0648\u0639 \u0627\u0644\u0637\u0644\u0628",
+   "options": "\u062a\u062d\u062f\u064a\u062b \u0631\u0645\u0632 \u0627\u0644\u0628\u0631\u064a\u062f \u0627\u0644\u0627\u0644\u0643\u062a\u0631\u0648\u0646\u064a\n\u0627\u0646\u0634\u0627\u0621 \u0628\u0631\u064a\u062f \u0627\u0644\u0643\u062a\u0631\u0648\u0646\u064a \u062c\u0627\u0645\u0639\u064a \u062c\u062f\u064a\u062f"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-05-18 12:35:02.026104",
+ "modified_by": "Administrator",
+ "module": "Uotelafer Leave Management",
+ "name": "Computer Center Support Form",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
