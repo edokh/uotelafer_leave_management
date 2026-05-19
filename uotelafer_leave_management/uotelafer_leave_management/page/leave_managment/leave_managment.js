@@ -401,7 +401,6 @@ class LeaveManagementPage {
 						<div class="lm-actions">
 							${this.current_tab === 'follow_up_leaves' ? `<button class="lm-action-btn print-pdf" data-name="${row.name}" style="background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; margin-left: 5px;">طباعة</button>` : ''}
 							<button class="lm-action-btn detail" data-name="${row.name}">${needs_action ? 'إجراء' : 'تفاصيل'}</button>
-							<button class="lm-action-btn delete-btn" data-name="${row.name}" style="background-color: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; margin-right: 5px;">حذف</button>
 						</div>
 					</td>
 				</tr>
@@ -409,24 +408,6 @@ class LeaveManagementPage {
 
 			tr.find('.detail').on('click', () => {
 				this.show_details_dialog(row);
-			});
-
-			tr.find('.delete-btn').on('click', () => {
-				frappe.confirm('هل أنت متأكد من حذف هذه الإجازة؟', () => {
-					frappe.call({
-						method: 'frappe.client.delete',
-						args: {
-							doctype: 'Leave',
-							name: row.name
-						},
-						callback: (r) => {
-							if (!r.exc) {
-								frappe.show_alert({ message: 'تم حذف الإجازة بنجاح', indicator: 'green' });
-								this.load_data();
-							}
-						}
-					});
-				});
 			});
 
 			if (this.current_tab === 'follow_up_leaves') {

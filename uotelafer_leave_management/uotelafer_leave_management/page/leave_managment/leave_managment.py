@@ -14,7 +14,7 @@ def get_employee_leaves(from_date=None, to_date=None, leave_type=None, status=No
         filters["to_date"] = ["<=", to_date]
     if leave_type:
         filters["leave_type"] = leave_type
-    if status:
+    if status and status != "All":
         filters["workflow_state"] = status
 
     leaves = frappe.get_all(
