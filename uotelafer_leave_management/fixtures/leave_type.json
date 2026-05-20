@@ -38,5 +38,13 @@
   "leave_type": "اجازة اعتيادية",
   "modified": "2026-05-04 20:18:51.328178",
   "name": "اجازة اعتيادية"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Leave Type",
+  "has_balance": 0,
+  "leave_type": "إلغاء إجازة",
+  "modified": "2026-05-20 12:00:00.000000",
+  "name": "إلغاء إجازة"
  }
 ]

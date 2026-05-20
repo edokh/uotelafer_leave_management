@@ -384,6 +384,7 @@ class LeaveManagementPage {
 			let can_approve_dept = this.current_tab === 'department_leaves' && row.workflow_state === 'Applied';
 			let can_approve_pres = this.current_tab === 'president_leaves' && row.workflow_state === 'Approved By Department';
 			let needs_action = can_approve_dept || can_approve_pres;
+			let can_cancel = this.current_tab === 'my_leaves' && row.workflow_state === 'Approved' && row.to_date >= frappe.datetime.nowdate() && row.leave_type !== 'إلغاء إجازة';
 
 			let attachment_btn = row.attachment ? `<button class="lm-action-btn detail" onclick="window.open('${row.attachment}', 'Attachment', 'width=800,height=800'); return false;">عرض</button>` : '-';
 
@@ -398,9 +399,9 @@ class LeaveManagementPage {
 					<td>${this.get_status_html(row.workflow_state)}</td>
 					<td>${row.dep || '-'}</td>
 					<td>
-						<div class="lm-actions">
-							${this.current_tab === 'follow_up_leaves' ? `<button class="lm-action-btn print-pdf" data-name="${row.name}" style="background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; margin-left: 5px;">طباعة</button>` : ''}
+							<button class="lm-action-btn print-pdf" data-name="${row.name}" style="background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; margin-left: 5px;">طباعة</button>
 							<button class="lm-action-btn detail" data-name="${row.name}">${needs_action ? 'إجراء' : 'تفاصيل'}</button>
+							${can_cancel ? `<button class="lm-action-btn stop-leave btn-warning" data-name="${row.name}" style="margin-right: 5px; background-color: #f59e0b; color: white; border: none;">قطع</button>` : ''}
 						</div>
 					</td>
 				</tr>
@@ -410,12 +411,18 @@ class LeaveManagementPage {
 				this.show_details_dialog(row);
 			});
 
-			if (this.current_tab === 'follow_up_leaves') {
-				tr.find('.print-pdf').on('click', () => {
-					let url = `/api/method/frappe.utils.print_format.download_pdf?doctype=Leave&name=${row.name}&format=Leave%20Print%20Form&no_letterhead=1&letterhead=No%20Letterhead&settings=%7B%7D&_lang=ar`;
-					window.open(url, '_blank');
+			if (can_cancel) {
+				tr.find('.stop-leave').on('click', (e) => {
+					e.stopPropagation();
+					this.show_cancellation_dialog(row);
 				});
 			}
+
+			tr.find('.print-pdf').on('click', (e) => {
+				e.stopPropagation();
+				let url = `/api/method/frappe.utils.print_format.download_pdf?doctype=Leave&name=${row.name}&format=Leave%20Print%20Form&no_letterhead=1&letterhead=No%20Letterhead&settings=%7B%7D&_lang=ar`;
+				window.open(url, '_blank');
+			});
 
 			tbody.append(tr);
 		});
@@ -472,7 +479,18 @@ class LeaveManagementPage {
 			title: 'تقديم إجازة جديدة',
 			fields: [
 				{ fieldtype: 'Data', fieldname: 'employee_fullname', label: 'الاسم الكامل', reqd: 1, default: this.user_fullname },
-				{ fieldtype: 'Link', fieldname: 'leave_type', label: 'نوع الإجازة', options: 'Leave Type', reqd: 1, default: 'اجازة اعتيادية' },
+				{ fieldtype: 'Link', fieldname: 'leave_type', label: 'نوع الإجازة', options: 'Leave Type', reqd: 1, default: 'اجازة اعتيادية', onchange: () => {
+					let val = dialog.get_value('leave_type');
+					if (val === 'إلغاء إجازة') {
+						dialog.set_df_property('original_leave', 'hidden', 0);
+						dialog.set_df_property('original_leave', 'reqd', 1);
+					} else {
+						dialog.set_df_property('original_leave', 'hidden', 1);
+						dialog.set_df_property('original_leave', 'reqd', 0);
+						dialog.set_value('original_leave', '');
+					}
+				} },
+				{ fieldtype: 'Link', fieldname: 'original_leave', label: 'الإجازة الأصلية', options: 'Leave', hidden: 1 },
 				{ fieldtype: 'Link', fieldname: 'dep', label: 'القسم', options: 'Leave Department', reqd: 1, default: this.last_dep },
 				{ fieldtype: 'Data', fieldname: 'personal_email', label: 'البريد الإلكتروني الشخصي', description: 'ايميل الاشعار', default: this.last_personal_email },
 				{ fieldtype: 'Column Break' },
@@ -492,6 +510,7 @@ class LeaveManagementPage {
 					args: {
 						employee_fullname: values.employee_fullname,
 						leave_type: values.leave_type,
+						original_leave: values.original_leave,
 						from_date: values.from_date,
 						to_date: values.to_date,
 						reason: values.reason,
@@ -512,7 +531,106 @@ class LeaveManagementPage {
 			}
 		});
 
+		dialog.get_field('original_leave').get_query = function() {
+			return {
+				filters: {
+					employee: frappe.session.user,
+					workflow_state: 'Approved'
+				}
+			};
+		};
+
+		dialog.fields_dict['original_leave'].df.onchange = () => {
+			let val = dialog.get_value('original_leave');
+			if (val) {
+				frappe.db.get_value('Leave', val, ['from_date', 'to_date', 'dep'])
+					.then(r => {
+						let doc = r.message;
+						if (doc) {
+							dialog.set_value('from_date', doc.from_date);
+							dialog.set_value('to_date', doc.to_date);
+							dialog.set_value('dep', doc.dep);
+							update_days();
+						}
+					});
+			}
+		};
+
 		dialog.show();
+	}
+
+	show_cancellation_dialog(row) {
+		let dialog;
+		let update_days = () => {
+			if (!dialog) return;
+			let from_date = dialog.get_value('from_date');
+			let to_date = dialog.get_value('to_date');
+			if (from_date && to_date) {
+				dialog.get_field('days_display').$wrapper.find('#lm-days-number').text('جاري الحساب...');
+				frappe.call({
+					method: "uotelafer_leave_management.uotelafer_leave_management.doctype.leave.leave.calculate_leave_days",
+					args: { from_date: from_date, to_date: to_date },
+					callback: (r) => {
+						if (r.message !== undefined) {
+							dialog.get_field('days_display').$wrapper.find('#lm-days-number').text(r.message);
+						}
+					}
+				});
+			}
+		};
+
+		let today = frappe.datetime.nowdate();
+		let default_from = today;
+		if (today < row.from_date) {
+			default_from = row.from_date;
+		} else if (today > row.to_date) {
+			default_from = row.to_date;
+		}
+
+		dialog = new frappe.ui.Dialog({
+			title: `قطع إجازة: ${row.name}`,
+			fields: [
+				{ fieldtype: 'Data', fieldname: 'employee_fullname', label: 'الاسم الكامل', reqd: 1, default: row.employee_fullname || row.employee, read_only: 1 },
+				{ fieldtype: 'Link', fieldname: 'leave_type', label: 'نوع الإجازة', options: 'Leave Type', reqd: 1, default: 'إلغاء إجازة', read_only: 1 },
+				{ fieldtype: 'Link', fieldname: 'original_leave', label: 'الإجازة الأصلية', options: 'Leave', reqd: 1, default: row.name, read_only: 1 },
+				{ fieldtype: 'Link', fieldname: 'dep', label: 'القسم', options: 'Leave Department', reqd: 1, default: row.dep, read_only: 1 },
+				{ fieldtype: 'Data', fieldname: 'personal_email', label: 'البريد الإلكتروني الشخصي', default: row.personal_email, read_only: 1 },
+				{ fieldtype: 'Column Break' },
+				{ fieldtype: 'Date', fieldname: 'from_date', label: 'من تاريخ القطع', reqd: 1, default: default_from, onchange: () => update_days() },
+				{ fieldtype: 'Date', fieldname: 'to_date', label: 'إلى تاريخ القطع', reqd: 1, default: row.to_date, onchange: () => update_days() },
+				{ fieldtype: 'Section Break' },
+				{ fieldtype: 'HTML', fieldname: 'days_display', options: '<div style="padding: 15px; background: #fef3c7; color: #92400e; border-radius: 12px; text-align: center; font-size: 18px; font-weight: 800; margin: 10px 0; border: 2px dashed #f59e0b;">عدد أيام القطع: <span id="lm-days-number">0</span></div>' },
+				{ fieldtype: 'Section Break' },
+				{ fieldtype: 'Small Text', fieldname: 'reason', label: 'سبب قطع الإجازة', reqd: 1 }
+			],
+			primary_action_label: 'إرسال طلب القطع',
+			primary_action: (values) => {
+				frappe.call({
+					method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.create_leave',
+					args: {
+						employee_fullname: values.employee_fullname,
+						leave_type: values.leave_type,
+						original_leave: values.original_leave,
+						from_date: values.from_date,
+						to_date: values.to_date,
+						reason: values.reason,
+						dep: values.dep,
+						personal_email: values.personal_email
+					},
+					freeze: true,
+					callback: (r) => {
+						if (!r.exc) {
+							frappe.show_alert({ message: 'تم تقديم طلب قطع الإجازة بنجاح', indicator: 'green' });
+							dialog.hide();
+							this.load_data();
+						}
+					}
+				});
+			}
+		});
+
+		dialog.show();
+		update_days();
 	}
 
 	async show_details_dialog(row) {
@@ -540,6 +658,11 @@ class LeaveManagementPage {
 					<div class="detail-label">نوع الإجازة</div>
 					<div class="detail-value">${row.leave_type}</div>
 				</div>
+				${row.original_leave ? `
+				<div class="lm-detail-item">
+					<div class="detail-label">الإجازة الأصلية</div>
+					<div class="detail-value"><a href="/app/leave/${row.original_leave}" target="_blank">${row.original_leave}</a></div>
+				</div>` : ''}
 				<div class="lm-detail-item">
 					<div class="detail-label">عدد الأيام</div>
 					<div class="detail-value" style="color: #2563eb;">${row.days} أيام</div>
@@ -614,6 +737,11 @@ class LeaveManagementPage {
 		}
 
 		let dialog = new frappe.ui.Dialog(dialog_options);
+
+		dialog.add_custom_action('طباعة PDF', () => {
+			let url = `/api/method/frappe.utils.print_format.download_pdf?doctype=Leave&name=${row.name}&format=Leave%20Print%20Form&no_letterhead=1&letterhead=No%20Letterhead&settings=%7B%7D&_lang=ar`;
+			window.open(url, '_blank');
+		});
 
 		if (needs_action) {
 			dialog.get_primary_btn().removeClass('btn-primary').addClass('btn-success');

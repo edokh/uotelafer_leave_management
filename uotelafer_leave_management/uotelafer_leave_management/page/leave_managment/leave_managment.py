@@ -22,12 +22,12 @@ def get_employee_leaves(from_date=None, to_date=None, leave_type=None, status=No
         filters=filters,
         fields=[
             "name", "employee", "employee_fullname", "dep",
-            "leave_type", "from_date", "to_date", "days",
+            "leave_type", "original_leave", "from_date", "to_date", "days",
             "reason", "workflow_state", "status",
             "date_of_application", "alternative_employee",
-            "supervisor", "attachment"
+            "supervisor", "attachment", "personal_email"
         ],
-        order_by="date_of_application desc",
+        order_by="modified desc",
         limit_page_length=100,
     )
     return leaves
@@ -70,12 +70,12 @@ def get_department_leaves(from_date=None, to_date=None, leave_type=None, status=
         filters=filters,
         fields=[
             "name", "employee", "employee_fullname", "dep",
-            "leave_type", "from_date", "to_date", "days",
+            "leave_type", "original_leave", "from_date", "to_date", "days",
             "reason", "workflow_state", "status",
             "date_of_application", "alternative_employee",
-            "supervisor", "attachment"
+            "supervisor", "attachment", "personal_email"
         ],
-        order_by="date_of_application desc",
+        order_by="modified desc",
         limit_page_length=200,
     )
     return leaves
@@ -106,12 +106,12 @@ def get_president_leaves(from_date=None, to_date=None, leave_type=None, status=N
         filters=filters,
         fields=[
             "name", "employee", "employee_fullname", "dep",
-            "leave_type", "from_date", "to_date", "days",
+            "leave_type", "original_leave", "from_date", "to_date", "days",
             "reason", "workflow_state", "status",
             "date_of_application", "alternative_employee",
-            "supervisor", "attachment"
+            "supervisor", "attachment", "personal_email"
         ],
-        order_by="date_of_application desc",
+        order_by="modified desc",
         limit_page_length=200,
     )
     return leaves
@@ -154,12 +154,12 @@ def get_all_leaves(from_date=None, to_date=None, leave_type=None, status=None, d
         filters=filters,
         fields=[
             "name", "employee", "employee_fullname", "dep",
-            "leave_type", "from_date", "to_date", "days",
+            "leave_type", "original_leave", "from_date", "to_date", "days",
             "reason", "workflow_state", "status",
             "date_of_application", "alternative_employee",
-            "supervisor", "attachment"
+            "supervisor", "attachment", "personal_email"
         ],
-        order_by="date_of_application desc",
+        order_by="modified desc",
         limit_page_length=500,
     )
     return leaves
@@ -227,7 +227,7 @@ def get_leave_comments(leave_name):
 
 
 @frappe.whitelist()
-def create_leave(leave_type, from_date, to_date, reason, dep, employee_fullname=None, alternative_employee=None, attachment=None, personal_email=None):
+def create_leave(leave_type, from_date, to_date, reason, dep, employee_fullname=None, alternative_employee=None, attachment=None, personal_email=None, original_leave=None):
     """Create a new leave request and apply the workflow"""
     user = frappe.session.user
 
@@ -255,6 +255,8 @@ def create_leave(leave_type, from_date, to_date, reason, dep, employee_fullname=
         doc.attachment = attachment
     if personal_email:
         doc.personal_email = personal_email
+    if original_leave:
+        doc.original_leave = original_leave
 
     doc.insert()
 

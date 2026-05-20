@@ -590,3 +590,12 @@
     .lm-tabs { gap: 2px; }
     .lm-tab { padding: 10px 14px; font-size: 14px; }
 }
+
+.lm-action-btn.stop-leave {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #fff !important;
+    box-shadow: 0 2px 8px rgba(245,158,11,.3);
+}
+.lm-action-btn.stop-leave:hover {
+    box-shadow: 0 4px 14px rgba(245,158,11,.45);
+}

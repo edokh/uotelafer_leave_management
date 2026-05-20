@@ -1,0 +1,439 @@
+{%- set leave_type_name = frappe.db.get_value("Leave Type", doc.leave_type, "leave_type") or doc.leave_type -%}
+{%- set dep_name = doc.dep -%}
+{%- set supervisor_name = frappe.db.get_value("Leave Employee", {"user": doc.supervisor}, "full_name") if doc.supervisor else "" -%}
+{%- set qr_data = doc.name ~ "|" ~ (doc.employee_fullname or "") ~ "|" ~ (leave_type_name or "") ~ "|" ~ (doc.from_date|string) ~ "|" ~ (doc.to_date|string) ~ "|" ~ (doc.days|string) ~ "|" ~ (doc.workflow_state or "Pending") -%}
+{%- set comments = frappe.get_all("Comment", filters={"reference_doctype": "Leave", "reference_name": doc.name, "comment_type": ["in", ["Comment", "Workflow"]]}, fields=["comment_by", "content", "creation", "comment_type"], order_by="creation asc") -%}
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+
+  .lp {
+    font-family: 'Cairo', 'Tahoma', sans-serif;
+    direction: rtl;
+    color: #1a1a2e;
+    max-width: 780px;
+    margin: 0 auto;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+
+  /* ── header ── */
+  .lp-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    border-bottom: 3px solid #1e3a5f;
+  }
+  .lp-head-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .lp-head-brand img {
+    height: 60px;
+  }
+  .lp-head-titles {
+    display: flex;
+    flex-direction: column;
+  }
+  .lp-head-titles span {
+    font-size: 10px;
+    color: #555;
+    font-weight: 600;
+  }
+  .lp-head-titles .main-name {
+    font-size: 14px;
+    color: #1e3a5f;
+    font-weight: 800;
+  }
+  .lp-head-center {
+    text-align: center;
+  }
+  .lp-head-center h1 {
+    font-size: 18px;
+    font-weight: 800;
+    color: #1e3a5f;
+    margin: 0;
+    letter-spacing: 0.5px;
+  }
+  .lp-head-center .ref {
+    font-size: 9px;
+    color: #888;
+    margin-top: 2px;
+  }
+  .lp-qr img {
+    width: 72px;
+    height: 72px;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+  }
+
+  /* ── section titles ── */
+  .lp-section-title {
+    font-size: 11px;
+    font-weight: 800;
+    color: #1e3a5f;
+    padding: 6px 0 4px 0;
+    margin-top: 14px;
+    border-bottom: 2px solid #e8ecf1;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .lp-section-title::before {
+    content: "";
+    width: 4px;
+    height: 14px;
+    background: #2b6cb0;
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  /* ── data grid ── */
+  .lp-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    margin-top: 6px;
+    border: 1px solid #d4dbe4;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .lp-cell {
+    display: flex;
+    align-items: center;
+    padding: 7px 10px;
+    border-bottom: 1px solid #edf0f4;
+    gap: 6px;
+  }
+  .lp-cell:nth-child(odd) {
+    border-left: 1px solid #edf0f4;
+  }
+  .lp-cell .k {
+    font-size: 10px;
+    color: #6b7a8d;
+    font-weight: 600;
+    white-space: nowrap;
+    min-width: 80px;
+  }
+  .lp-cell .v {
+    font-weight: 700;
+    color: #1a1a2e;
+    font-size: 11px;
+  }
+  .lp-cell.full {
+    grid-column: 1 / -1;
+  }
+  .lp-cell.full .v {
+    font-weight: 400;
+    line-height: 1.6;
+  }
+  .lp-cell .tag {
+    background: #e8f0fe;
+    color: #1e3a5f;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 10px;
+  }
+  .lp-cell .days-num {
+    font-size: 16px;
+    font-weight: 800;
+    color: #2b6cb0;
+  }
+
+  /* ── workflow timeline ── */
+  .lp-steps {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin: 10px 0 6px 0;
+    position: relative;
+    padding: 0 10px;
+  }
+  .lp-steps::before {
+    content: "";
+    position: absolute;
+    top: 14px;
+    right: 55px;
+    left: 55px;
+    height: 2px;
+    background: #d4dbe4;
+  }
+  .lp-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 1;
+    width: 110px;
+  }
+  .lp-step-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 800;
+    border: 2px solid #d4dbe4;
+    background: #fff;
+    color: #aaa;
+  }
+  .lp-step.done .lp-step-dot {
+    background: #38a169;
+    border-color: #38a169;
+    color: #fff;
+  }
+  .lp-step.fail .lp-step-dot {
+    background: #e53e3e;
+    border-color: #e53e3e;
+    color: #fff;
+  }
+  .lp-step-label {
+    margin-top: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    color: #333;
+    text-align: center;
+    line-height: 1.3;
+  }
+  .lp-step-date {
+    font-size: 9px;
+    color: #888;
+    text-align: center;
+  }
+
+  /* ── comments ── */
+  .lp-comments {
+    margin-top: 6px;
+    border: 1px solid #d4dbe4;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .lp-comment {
+    padding: 6px 10px;
+    border-bottom: 1px solid #edf0f4;
+    font-size: 10px;
+  }
+  .lp-comment:last-child {
+    border-bottom: none;
+  }
+  .lp-comment-head {
+    display: flex;
+    justify-content: space-between;
+    color: #6b7a8d;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .lp-comment-body {
+    color: #333;
+    font-weight: 400;
+  }
+
+  /* ── signatures ── */
+  .lp-sigs {
+    display: flex;
+    gap: 16px;
+    margin-top: 14px;
+  }
+  .lp-sig {
+    flex: 1;
+    border: 1px solid #d4dbe4;
+    border-radius: 6px;
+    text-align: center;
+  }
+  .lp-sig-head {
+    background: #f6f8fb;
+    padding: 5px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #1e3a5f;
+    border-bottom: 1px solid #e8ecf1;
+  }
+  .lp-sig-body {
+    height: 70px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .lp-approved-tag {
+    border: 2px solid #38a169;
+    color: #38a169;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 800;
+    transform: rotate(-4deg);
+    z-index: 2;
+    background: rgba(255,255,255,.9);
+  }
+  .lp-approved-tag.pres {
+    border-color: #2b6cb0;
+    color: #2b6cb0;
+  }
+  .lp-sig-foot {
+    font-size: 9px;
+    color: #6b7a8d;
+    padding: 4px 8px 6px;
+    border-top: 1px dashed #e8ecf1;
+    text-align: right;
+    line-height: 1.6;
+  }
+
+  /* ── footer ── */
+  .lp-foot {
+    text-align: center;
+    font-size: 8px;
+    color: #aaa;
+    margin-top: 12px;
+    padding-top: 6px;
+    border-top: 1px solid #edf0f4;
+  }
+</style>
+
+<div class="lp">
+
+  <!-- ═══ HEADER ═══ -->
+  <div class="lp-head">
+    <div class="lp-head-brand">
+      <img src="/assets/uotelafer_leave_management/logo.jpg" alt="">
+      <div class="lp-head-titles">
+        <span>جمهورية العراق — وزارة التعليم العالي</span>
+        <span class="main-name">جامعة تلعفر</span>
+      </div>
+    </div>
+    <div class="lp-head-center">
+      <h1>نموذج طلب إجازة</h1>
+      <div class="ref">{{ doc.name }}</div>
+    </div>
+    <div class="lp-qr">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ qr_data | urlencode }}" alt="QR">
+    </div>
+  </div>
+
+  <!-- ═══ EMPLOYEE & LEAVE INFO ═══ -->
+  <div class="lp-section-title">بيانات الموظف والإجازة</div>
+  <div class="lp-grid">
+    <div class="lp-cell">
+      <span class="k">الموظف</span>
+      <span class="v">{{ doc.employee_fullname }}</span>
+    </div>
+    <div class="lp-cell">
+      <span class="k">القسم</span>
+      <span class="v">{{ dep_name }}</span>
+    </div>
+    <div class="lp-cell">
+      <span class="k">نوع الإجازة</span>
+      <span class="v"><span class="tag">{{ leave_type_name }}</span></span>
+    </div>
+    <div class="lp-cell">
+      <span class="k">عدد الأيام</span>
+      <span class="v"><span class="days-num">{{ doc.days }}</span> يوم</span>
+    </div>
+    <div class="lp-cell">
+      <span class="k">من تاريخ</span>
+      <span class="v">{{ doc.from_date }}</span>
+    </div>
+    <div class="lp-cell">
+      <span class="k">إلى تاريخ</span>
+      <span class="v">{{ doc.to_date }}</span>
+    </div>
+    {% if doc.alternative_employee %}
+    <div class="lp-cell full">
+      <span class="k">الموظف البديل</span>
+      <span class="v">{{ doc.alternative_employee }}</span>
+    </div>
+    {% endif %}
+    <div class="lp-cell full">
+      <span class="k">السبب</span>
+      <span class="v">{{ doc.reason }}</span>
+    </div>
+    {% if doc.original_leave %}
+    <div class="lp-cell full">
+      <span class="k">الإجازة الأصلية</span>
+      <span class="v">{{ doc.original_leave }}</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- ═══ WORKFLOW TIMELINE ═══ -->
+  <div class="lp-section-title">مراحل سير المعاملة</div>
+
+  {%- set ws = doc.workflow_state or "Pending" -%}
+  {%- set s_done = ws in ['Approved By Department', 'Approved'] -%}
+  {%- set s_fail = ws == 'Rejected' and not doc.date_of_presidant_action -%}
+  {%- set p_done = ws == 'Approved' -%}
+  {%- set p_fail = ws == 'Rejected' and doc.date_of_presidant_action -%}
+
+  <div class="lp-steps">
+    <div class="lp-step done">
+      <div class="lp-step-dot">✓</div>
+      <div class="lp-step-label">تقديم الطلب</div>
+      <div class="lp-step-date">{{ doc.date_of_application or doc.creation.strftime('%Y-%m-%d') }}</div>
+    </div>
+    <div class="lp-step {% if s_done %}done{% elif s_fail %}fail{% endif %}">
+      <div class="lp-step-dot">{% if s_done %}✓{% elif s_fail %}✗{% else %}٢{% endif %}</div>
+      <div class="lp-step-label">رئيس القسم</div>
+      <div class="lp-step-date">{{ doc.date_of_supervisor_action or "—" }}</div>
+    </div>
+    <div class="lp-step {% if p_done %}done{% elif p_fail %}fail{% endif %}">
+      <div class="lp-step-dot">{% if p_done %}✓{% elif p_fail %}✗{% else %}٣{% endif %}</div>
+      <div class="lp-step-label">رئيس الجامعة</div>
+      <div class="lp-step-date">{{ doc.date_of_presidant_action or "—" }}</div>
+    </div>
+  </div>
+
+  <!-- ═══ COMMENTS ═══ -->
+  {% if comments %}
+  <div class="lp-section-title">ملاحظات وتعليقات</div>
+  <div class="lp-comments">
+    {% for c in comments %}
+    {%- set commenter_name = frappe.db.get_value("Leave Employee", {"user": c.comment_by}, "full_name") if c.comment_by else "" -%}
+    <div class="lp-comment">
+      <div class="lp-comment-head">
+        <span>{{ commenter_name or "النظام" }}</span>
+        <span>{{ c.creation.strftime('%Y-%m-%d') if c.creation else '' }}</span>
+      </div>
+      <div class="lp-comment-body">{{ c.content | striptags }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- ═══ SIGNATURES ═══ -->
+  <div class="lp-sigs">
+    <div class="lp-sig">
+      <div class="lp-sig-head">توقيع رئيس القسم</div>
+      <div class="lp-sig-body">
+        {% if s_done %}
+        <div class="lp-approved-tag">معتمد إلكترونياً</div>
+        {% endif %}
+      </div>
+      <div class="lp-sig-foot">
+        الاسم: {{ supervisor_name or "—" }}<br>
+        التاريخ: {{ doc.date_of_supervisor_action or "—" }}
+      </div>
+    </div>
+    <div class="lp-sig">
+      <div class="lp-sig-head">توقيع رئيس الجامعة</div>
+      <div class="lp-sig-body">
+        {% if p_done %}
+        <div class="lp-approved-tag pres">معتمد نهائياً</div>
+        {% endif %}
+      </div>
+      <div class="lp-sig-foot">
+        التاريخ: {{ doc.date_of_presidant_action or "—" }}
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <div class="lp-foot">
+    هذا النموذج صادر إلكترونياً من نظام إدارة الإجازات — جامعة تلعفر &bull; يمكن التحقق عبر مسح رمز QR
+  </div>
+
+</div>

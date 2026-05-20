@@ -60,6 +60,51 @@ class Leave(Document):
 		if self.from_date and self.to_date:
 			self.days = calculate_leave_days(self.from_date, self.to_date)
 		
+		# If this is a Cancellation request
+		if self.leave_type == "إلغاء إجازة":
+			if not self.original_leave:
+				frappe.throw(_("Original Leave is required for a cancellation request."))
+				
+			original_leave_doc = frappe.get_doc("Leave", self.original_leave)
+			
+			# Validate employee matches
+			if original_leave_doc.employee != self.employee:
+				frappe.throw(_("The original leave must belong to the same employee."))
+				
+			# Validate original leave is approved
+			if original_leave_doc.workflow_state != "Approved":
+				frappe.throw(_("Only approved leaves can be cancelled. The original leave is currently {0}.").format(original_leave_doc.workflow_state))
+				
+			# Validate cancellation dates fall within original leave dates
+			from frappe.utils import getdate
+			orig_from = getdate(original_leave_doc.from_date)
+			orig_to = getdate(original_leave_doc.to_date)
+			cancel_from = getdate(self.from_date)
+			cancel_to = getdate(self.to_date)
+			
+			if cancel_from < orig_from or cancel_to > orig_to:
+				frappe.throw(_("Cancellation dates must fall within the original leave period ({0} to {1}).").format(
+					original_leave_doc.from_date,
+					original_leave_doc.to_date
+				))
+				
+			# Check for overlapping cancellation requests for the same original leave
+			overlapping = frappe.get_all(
+				"Leave",
+				filters={
+					"original_leave": self.original_leave,
+					"name": ["!=", self.name],
+					"workflow_state": ["!=", "Rejected"],
+					"from_date": ["<=", self.to_date],
+					"to_date": [">=", self.from_date]
+				}
+			)
+			if overlapping:
+				frappe.throw(_("This cancellation period overlaps with an existing cancellation request for the same leave."))
+		else:
+			# Check for overlapping leaves for the same employee
+			check_overlapping_leaves(self.employee, self.from_date, self.to_date, self.name)
+		
 		# Validate that the employee has sufficient leave balance if the type requires it
 		if self.employee and self.leave_type and self.days:
 			has_balance = frappe.db.get_value("Leave Type", self.leave_type, "has_balance")
@@ -85,24 +130,47 @@ class Leave(Document):
 			frappe.throw(_("Cannot submit a Rejected leave request"))
 
 	def on_submit(self):
-		"""Create a Leave Balance Transaction of type Consumption after submission"""
+		"""Create a Leave Balance Transaction after submission"""
 		if not self.days:
 			return
 
-		has_balance = frappe.db.get_value("Leave Type", self.leave_type, "has_balance")
-		if not has_balance:
-			return
+		if self.leave_type == "إلغاء إجازة":
+			# For Cancellation, create an Addition transaction for the original leave type
+			original_leave_doc = frappe.get_doc("Leave", self.original_leave)
+			has_balance = frappe.db.get_value("Leave Type", original_leave_doc.leave_type, "has_balance")
+			if not has_balance:
+				return
 
-		transaction = frappe.new_doc("Leave Balance Transaction")
-		transaction.employee = self.employee
-		transaction.leave_type = self.leave_type
-		transaction.transaction_type = "Consumption"
-		transaction.balance = self.days
-		transaction.date = frappe.utils.today()
-		transaction.note = f"Consumption from Leave {self.name}"
-		transaction.insert(ignore_permissions=True)
-		
-		frappe.msgprint(_("Leave Balance Transaction created for Consumption."))
+			transaction = frappe.new_doc("Leave Balance Transaction")
+			transaction.employee = self.employee
+			transaction.leave_type = original_leave_doc.leave_type
+			transaction.transaction_type = "Addition"
+			transaction.balance = self.days
+			transaction.date = frappe.utils.today()
+			transaction.note = f"Addition from Leave Cancellation {self.name} (Original Leave: {self.original_leave})"
+			transaction.insert(ignore_permissions=True)
+			
+			frappe.msgprint(_("Leave Balance Transaction created for Addition (Cancellation)."))
+		else:
+			# For standard leaves, create a Consumption transaction
+			has_balance = frappe.db.get_value("Leave Type", self.leave_type, "has_balance")
+			if not has_balance:
+				return
+
+			transaction = frappe.new_doc("Leave Balance Transaction")
+			transaction.employee = self.employee
+			transaction.leave_type = self.leave_type
+			transaction.transaction_type = "Consumption"
+			transaction.balance = self.days
+			transaction.date = frappe.utils.today()
+			transaction.note = f"Consumption from Leave {self.name}"
+			transaction.insert(ignore_permissions=True)
+			
+			frappe.msgprint(_("Leave Balance Transaction created for Consumption."))
+
+	def on_cancel(self):
+		"""Delete the corresponding Leave Balance Transaction if cancelled"""
+		frappe.db.delete("Leave Balance Transaction", {"note": ["like", f"%{self.name}%"]})
 
 
 
@@ -144,6 +212,7 @@ def get_all_leave_balances(employee, current_leave_name=None):
 		filters = {
 			"employee": employee,
 			"leave_type": leave_type,
+			"docstatus": 0,
 		}
 		
 		# Exclude current leave if provided
@@ -201,6 +270,7 @@ def get_leave_balance(employee, leave_type, current_leave_name=None):
 	filters = {
 		"employee": employee,
 		"leave_type": leave_type,
+		"docstatus": 0,
 	}
 	
 	# Exclude current leave if provided
@@ -271,3 +341,75 @@ def calculate_leave_days(from_date, to_date):
 		current_date += timedelta(days=1)
 	
 	return working_days
+
+
+def check_overlapping_leaves(employee, from_date, to_date, exclude_leave_name=None):
+	from frappe.utils import getdate
+	
+	from_date = getdate(from_date)
+	to_date = getdate(to_date)
+	
+	# Fetch all leaves of this employee that overlap with the date range and are not Rejected
+	leaves = frappe.get_all(
+		"Leave",
+		filters={
+			"employee": employee,
+			"name": ["!=", exclude_leave_name] if exclude_leave_name else None,
+			"workflow_state": ["!=", "Rejected"],
+			"from_date": ["<=", to_date],
+			"to_date": [">=", from_date]
+		},
+		fields=["name", "from_date", "to_date", "leave_type", "original_leave"]
+	)
+	
+	if not leaves:
+		return
+		
+	# Categorize regular leaves and cancellation leaves
+	regular_leaves = []
+	cancellation_leaves = []
+	for l in leaves:
+		if l.leave_type == "إلغاء إجازة":
+			cancellation_leaves.append(l)
+		else:
+			regular_leaves.append(l)
+			
+	if not regular_leaves:
+		return
+		
+	# Build a set of all cancelled dates for this employee
+	# Fetch any cancellations that might fall within this period
+	all_cancellations = frappe.get_all(
+		"Leave",
+		filters={
+			"employee": employee,
+			"leave_type": "إلغاء إجازة",
+			"workflow_state": ["!=", "Rejected"]
+		},
+		fields=["from_date", "to_date"]
+	)
+	
+	cancelled_dates = set()
+	for cl in all_cancellations:
+		curr = getdate(cl.from_date)
+		end = getdate(cl.to_date)
+		while curr <= end:
+			cancelled_dates.add(curr)
+			curr += timedelta(days=1)
+			
+	# Build a set of active leave dates
+	leave_dates = set()
+	for rl in regular_leaves:
+		curr = getdate(rl.from_date)
+		end = getdate(rl.to_date)
+		while curr <= end:
+			if curr not in cancelled_dates:
+				leave_dates.add(curr)
+			curr += timedelta(days=1)
+			
+	# Check if any date in the proposed range is an active leave date
+	curr = from_date
+	while curr <= to_date:
+		if curr in leave_dates:
+			frappe.throw(_("Employee is already on leave on {0}").format(curr.strftime("%Y-%m-%d")))
+		curr += timedelta(days=1)
