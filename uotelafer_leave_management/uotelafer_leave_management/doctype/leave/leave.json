@@ -1,6 +1,6 @@
 {
  "actions": [],
- "autoname": "hash",
+ "autoname": "LV-.###",
  "creation": "2026-04-09 15:37:14.570993",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -214,7 +214,7 @@
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave",
- "naming_rule": "Random",
+ "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {

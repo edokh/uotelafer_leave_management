@@ -41,5 +41,8 @@ fixtures = [
         "filters": [["name", "in", ["University Employee", "University President", "Department Head", "Follow Up Employee", "HR Employee"]]]
     }
 ]
-
-
+jinja = {
+    "methods": [
+        "uotelafer_leave_management.utils.get_qr_code"
+    ]
+}
