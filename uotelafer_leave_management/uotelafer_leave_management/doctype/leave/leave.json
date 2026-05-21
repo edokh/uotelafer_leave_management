@@ -24,6 +24,7 @@
   "date_of_supervisor_action",
   "date_of_presidant_action",
   "status",
+  "printed",
   "amended_from",
   "attachment",
   "section_break_tele",
@@ -205,6 +206,12 @@
    "fieldname": "date_of_presidant_action",
    "fieldtype": "Date",
    "label": "Date of Presidant Action"
+  },
+  {
+   "default": "0",
+   "fieldname": "printed",
+   "fieldtype": "Check",
+   "label": "Printed"
   }
  ],
  "index_web_pages_for_search": 1,

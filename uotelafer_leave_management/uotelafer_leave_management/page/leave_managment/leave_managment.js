@@ -14,6 +14,7 @@ class LeaveManagementPage {
 		$(wrapper).find('.page-head').hide();
 		this.user_roles = {};
 		this.current_tab = 'my_leaves';
+		this.selected_leaves = [];
 
 		frappe.require('leave_managment.css', () => {
 			this.init();
@@ -83,15 +84,23 @@ class LeaveManagementPage {
 			<div class="leave-management-page">
 				<div class="lm-header">
 					<h1>إدارة الإجازات <span class="lm-icon">🌴</span></h1>
-					<button class="lm-new-btn" id="btn-new-leave">
-						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-						تقديم إجازة جديدة
-					</button>
-					${this.user_roles.is_employee ? `
-					<button class="lm-filter-clear" style="border-color: #2563eb; color: #2563eb;" id="btn-show-balances">
-						رصيد إجازاتي
-					</button>
-					` : ''}
+					<div style="display: flex; gap: 8px; align-items: center;">
+						${this.user_roles.is_follow_up ? `
+						<button class="lm-filter-clear" style="border-color: #2b6cb0; color: #2b6cb0; display: none;" id="btn-bulk-print" disabled>
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width: 16px; height: 16px; display: inline-block; vertical-align: middle; margin-left: 4px;"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+							طباعة جماعية (<span id="bulk-print-count">0</span>)
+						</button>
+						` : ''}
+						<button class="lm-new-btn" id="btn-new-leave">
+							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+							تقديم إجازة جديدة
+						</button>
+						${this.user_roles.is_employee ? `
+						<button class="lm-filter-clear" style="border-color: #2563eb; color: #2563eb;" id="btn-show-balances">
+							رصيد إجازاتي
+						</button>
+						` : ''}
+					</div>
 				</div>
 				
 				<div class="lm-tabs">
@@ -102,7 +111,14 @@ class LeaveManagementPage {
 					${this.user_roles.is_follow_up || this.user_roles.is_admin ? `<button class="lm-tab ${this.current_tab === 'follow_up_leaves' ? 'active' : ''}" data-tab="follow_up_leaves">متابعة الإجازات</button>` : ''}
 				</div>
 
-				<div class="lm-filters">
+				<div class="lm-filters-wrapper">
+					<div class="lm-filters-header-mobile">
+						<button class="lm-filter-toggle" id="btn-toggle-filters">
+							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+							الفلاتر المتقدمة
+						</button>
+					</div>
+					<div class="lm-filters" id="lm-filters-content">
 					<div class="lm-filter-group">
 						<label>من تاريخ</label>
 						<input type="date" id="filter-from-date">
@@ -140,8 +156,17 @@ class LeaveManagementPage {
 							<option value="Rejected">مرفوضة</option>
 						</select>
 					</div>
+					<div class="lm-filter-group" id="printed-filter-wrapper" style="display: none;">
+						<label>حالة الطباعة</label>
+						<select id="filter-printed">
+							<option value="All">الكل</option>
+							<option value="Not Printed">غير مطبوعة</option>
+							<option value="Printed">مطبوعة</option>
+						</select>
+					</div>
 					<button class="lm-filter-btn" id="btn-filter">تحديث</button>
 					<button class="lm-filter-clear" id="btn-clear-filter">مسح</button>
+					</div>
 				</div>
 
 				<div class="lm-stats" id="lm-stats-container">
@@ -192,8 +217,12 @@ class LeaveManagementPage {
 
 	update_tab_ui() {
 		let status_val = "";
+		this.selected_leaves = [];
+		this.update_bulk_print_btn();
 		
 		if (this.current_tab === 'follow_up_leaves') {
+			this.wrapper.find('#printed-filter-wrapper').show();
+			this.wrapper.find('#btn-bulk-print').show();
 			this.wrapper.find('#filter-status').html(`
 				<option value="Approved">مقبولة</option>
 				<option value="Submitted">مقدمة</option>
@@ -201,6 +230,8 @@ class LeaveManagementPage {
 			`);
 			status_val = "Approved";
 		} else {
+			this.wrapper.find('#printed-filter-wrapper').hide();
+			this.wrapper.find('#btn-bulk-print').hide();
 			this.wrapper.find('#filter-status').html(`
 				<option value="All">الكل</option>
 				<option value="Pending">قيد الإنتظار</option>
@@ -247,16 +278,136 @@ class LeaveManagementPage {
 			this.load_data();
 		});
 
+		this.wrapper.find('#btn-toggle-filters').on('click', () => {
+			this.wrapper.find('#lm-filters-content').slideToggle('fast');
+		});
+
 		this.wrapper.find('#btn-clear-filter').on('click', () => {
 			this.wrapper.find('#filter-from-date').val('');
 			this.wrapper.find('#filter-to-date').val('');
 			this.wrapper.find('#filter-leave-type').val('');
 			this.wrapper.find('#filter-dep').val('');
 			this.wrapper.find('#filter-employee').val('');
+			this.wrapper.find('#filter-printed').val('All');
 
 			this.update_tab_ui();
 			this.load_data();
 		});
+
+		// Checkbox select all handler
+		this.wrapper.on('change', '#chk-select-all', (e) => {
+			let checked = $(e.currentTarget).prop('checked');
+			this.wrapper.find('.chk-select-row').prop('checked', checked);
+			
+			this.selected_leaves = [];
+			if (checked) {
+				this.wrapper.find('.chk-select-row').each((i, el) => {
+					this.selected_leaves.push($(el).data('name'));
+				});
+			}
+			this.update_bulk_print_btn();
+		});
+
+		// Checkbox row handler
+		this.wrapper.on('change', '.chk-select-row', (e) => {
+			let name = $(e.currentTarget).data('name');
+			let checked = $(e.currentTarget).prop('checked');
+			
+			if (checked) {
+				if (!this.selected_leaves.includes(name)) {
+					this.selected_leaves.push(name);
+				}
+			} else {
+				this.selected_leaves = this.selected_leaves.filter(n => n !== name);
+			}
+			
+			this.update_select_all_state();
+			this.update_bulk_print_btn();
+		});
+
+		// Bulk print click handler
+		this.wrapper.on('click', '#btn-bulk-print', async () => {
+			if (!this.selected_leaves || this.selected_leaves.length === 0) {
+				frappe.show_alert({ message: 'يرجى اختيار إجازة واحدة على الأقل للطباعة', indicator: 'orange' });
+				return;
+			}
+			
+			frappe.dom.freeze('جاري تجهيز الطباعة...');
+			try {
+				let r = await frappe.call({
+					method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_bulk_print_html',
+					args: {
+						leave_names: JSON.stringify(this.selected_leaves)
+					}
+				});
+				
+				if (r.message) {
+					let print_window = window.open('', '_blank');
+					print_window.document.write(`
+						<html>
+						<head>
+							<title>طباعة الإجازات الجماعية</title>
+							<style>
+								@media print {
+									.bulk-print-page {
+										page-break-after: always;
+									}
+								}
+							</style>
+						</head>
+						<body onload="window.print(); window.close();">
+							${r.message}
+						</body>
+						</html>
+					`);
+					print_window.document.close();
+					
+					await frappe.call({
+						method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.mark_leaves_as_printed',
+						args: {
+							leave_names: JSON.stringify(this.selected_leaves)
+						}
+					});
+					
+					frappe.show_alert({ message: 'تم تحديث حالة الطباعة للإجازات بنجاح', indicator: 'green' });
+					this.selected_leaves = [];
+					this.update_bulk_print_btn();
+					this.load_data();
+				}
+			} catch (e) {
+				console.error(e);
+				frappe.show_alert({ message: 'حدث خطأ أثناء الطباعة الجماعية', indicator: 'red' });
+			} finally {
+				frappe.dom.unfreeze();
+			}
+		});
+	}
+
+	update_select_all_state() {
+		let total_checkboxes = this.wrapper.find('.chk-select-row').length;
+		let checked_checkboxes = this.wrapper.find('.chk-select-row:checked').length;
+		let chk_all = this.wrapper.find('#chk-select-all');
+		
+		if (total_checkboxes === 0) {
+			chk_all.prop('checked', false).prop('indeterminate', false);
+		} else if (checked_checkboxes === total_checkboxes) {
+			chk_all.prop('checked', true).prop('indeterminate', false);
+		} else if (checked_checkboxes === 0) {
+			chk_all.prop('checked', false).prop('indeterminate', false);
+		} else {
+			chk_all.prop('checked', false).prop('indeterminate', true);
+		}
+	}
+
+	update_bulk_print_btn() {
+		let count = this.selected_leaves.length;
+		let btn = this.wrapper.find('#btn-bulk-print');
+		this.wrapper.find('#bulk-print-count').text(count);
+		if (count > 0) {
+			btn.prop('disabled', false).css('opacity', '1');
+		} else {
+			btn.prop('disabled', true).css('opacity', '0.6');
+		}
 	}
 
 	get_filters() {
@@ -273,17 +424,20 @@ class LeaveManagementPage {
 			leave_type: this.wrapper.find('#filter-leave-type').val(),
 			status: this.wrapper.find('#filter-status').val(),
 			dep: this.wrapper.find('#filter-dep').val(),
-			employee_name: emp_name
+			employee_name: emp_name,
+			printed: this.current_tab === 'follow_up_leaves' ? this.wrapper.find('#filter-printed').val() : null
 		};
 	}
 
 	render_skeleton() {
 		let html = '';
+		let cols = this.current_tab === 'follow_up_leaves' ? 10 : 9;
 		for (let i = 0; i < 5; i++) {
 			html += `
 				<tr class="lm-skeleton-row">
-					<td colspan="9">
+					<td colspan="${cols}">
 						<div style="display:flex; gap:16px;">
+							${this.current_tab === 'follow_up_leaves' ? '<div class="lm-skeleton" style="flex:0.2"></div>' : ''}
 							<div class="lm-skeleton" style="flex:2"></div>
 							<div class="lm-skeleton" style="flex:1"></div>
 							<div class="lm-skeleton" style="flex:1"></div>
@@ -369,10 +523,28 @@ class LeaveManagementPage {
 		let tbody = this.wrapper.find('#lm-table-body');
 		tbody.empty();
 
+		// Update the headers dynamically based on current tab
+		let thead = this.wrapper.find('.lm-table thead tr');
+		thead.empty();
+		if (this.current_tab === 'follow_up_leaves') {
+			thead.append('<th><input type="checkbox" id="chk-select-all"></th>');
+		}
+		thead.append(`
+			<th>الموظف</th>
+			<th>نوع الإجازة</th>
+			<th>من تاريخ</th>
+			<th>الأيام</th>
+			<th>السبب</th>
+			<th>المرفقات</th>
+			<th>الحالة</th>
+			<th>القسم</th>
+			<th>الإجراءات</th>
+		`);
+
 		if (data.length === 0) {
 			tbody.html(`
 				<tr>
-					<td colspan="9">
+					<td colspan="${this.current_tab === 'follow_up_leaves' ? 10 : 9}">
 						<div class="lm-empty">
 							<div class="empty-icon">📁</div>
 							<p>لا توجد بيانات لعرضها</p>
@@ -393,15 +565,27 @@ class LeaveManagementPage {
 
 			let attachment_btn = row.attachment ? `<button class="lm-action-btn detail" onclick="window.open('${row.attachment}', 'Attachment', 'width=800,height=800'); return false;">عرض</button>` : '-';
 
+			let checkbox_td = '';
+			if (this.current_tab === 'follow_up_leaves') {
+				let checked = this.selected_leaves.includes(row.name) ? 'checked' : '';
+				checkbox_td = `<td><input type="checkbox" class="chk-select-row" data-name="${row.name}" ${checked}></td>`;
+			}
+
+			let status_badges = this.get_status_html(row.workflow_state);
+			if (row.printed) {
+				status_badges += ` <span class="lm-status printed"><span class="status-dot"></span>مطبوع</span>`;
+			}
+
 			let tr = $(`
 				<tr>
+					${checkbox_td}
 					<td><b>${row.employee_fullname || row.employee}</b></td>
 					<td>${row.leave_type}</td>
 					<td>${row.from_date}</td>
 					<td><b>${row.days}</b></td>
 					<td style="max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${row.reason || ''}">${reason_text}</td>
 					<td>${attachment_btn}</td>
-					<td>${this.get_status_html(row.workflow_state)}</td>
+					<td>${status_badges}</td>
 					<td>${row.dep || '-'}</td>
 					<td>
 							<button class="lm-action-btn print-pdf" data-name="${row.name}" style="background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; margin-left: 5px;">طباعة</button>
@@ -431,6 +615,11 @@ class LeaveManagementPage {
 
 			tbody.append(tr);
 		});
+
+		if (this.current_tab === 'follow_up_leaves') {
+			this.update_select_all_state();
+			this.update_bulk_print_btn();
+		}
 	}
 
 	show_balances_dialog() {

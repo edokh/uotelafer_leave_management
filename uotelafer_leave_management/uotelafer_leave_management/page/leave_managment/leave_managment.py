@@ -118,12 +118,12 @@ def get_president_leaves(from_date=None, to_date=None, leave_type=None, status=N
 
 
 @frappe.whitelist()
-def get_all_leaves(from_date=None, to_date=None, leave_type=None, status=None, dep=None, employee_name=None):
-    """Get all leaves for Follow Up Employee"""
+def get_all_leaves(from_date=None, to_date=None, leave_type=None, status=None, dep=None, employee_name=None, printed=None):
+    """Get all leaves for Follow Up / HR Employee"""
     user = frappe.session.user
     roles = frappe.get_roles(user)
 
-    if "Follow Up Employee" not in roles and "System Manager" not in roles:
+    if "Follow Up Employee" not in roles and "HR Employee" not in roles and "System Manager" not in roles:
         frappe.throw(_("Access Denied"))
 
     filters = {}
@@ -149,6 +149,11 @@ def get_all_leaves(from_date=None, to_date=None, leave_type=None, status=None, d
     if employee_name:
         filters["employee"] = employee_name
 
+    if printed == "Printed":
+        filters["printed"] = 1
+    elif printed == "Not Printed":
+        filters["printed"] = 0
+
     leaves = frappe.get_all(
         "Leave",
         filters=filters,
@@ -157,7 +162,7 @@ def get_all_leaves(from_date=None, to_date=None, leave_type=None, status=None, d
             "leave_type", "original_leave", "from_date", "to_date", "days",
             "reason", "workflow_state", "status",
             "date_of_application", "alternative_employee",
-            "supervisor", "attachment", "personal_email"
+            "supervisor", "attachment", "personal_email", "printed"
         ],
         order_by="modified desc",
         limit_page_length=500,
@@ -212,7 +217,7 @@ def get_user_roles():
         "is_employee": "University Employee" in roles,
         "is_dept_head": is_dept_head,
         "is_president": "University President" in roles,
-        "is_follow_up": "Follow Up Employee" in roles,
+        "is_follow_up": "Follow Up Employee" in roles or "HR Employee" in roles or "System Manager" in roles,
         "is_admin": "System Manager" in roles,
         "is_proxy_submitter": "Leave Proxy Submitter" in roles or "System Manager" in roles,
         "user": user,
@@ -321,4 +326,41 @@ def create_leave(leave_type, from_date, to_date, reason, dep, employee=None, emp
         pass
 
     return doc.name
+
+
+@frappe.whitelist()
+def get_bulk_print_html(leave_names):
+    """Get the combined print HTML for multiple leaves"""
+    import json
+    if isinstance(leave_names, str):
+        leave_names = json.loads(leave_names)
+    
+    html_content = ""
+    for name in leave_names:
+        doc = frappe.get_doc("Leave", name)
+        # Render leave using standard print format
+        rendered = frappe.get_print(
+            doctype="Leave",
+            name=name,
+            print_format="Leave Print Form",
+            no_letterhead=True
+        )
+        # Add print format style page break
+        html_content += f'<div class="bulk-print-page" style="page-break-after: always; padding: 20px;">{rendered}</div>'
+    
+    return html_content
+
+
+@frappe.whitelist()
+def mark_leaves_as_printed(leave_names):
+    """Mark a list of leaves as printed"""
+    import json
+    if isinstance(leave_names, str):
+        leave_names = json.loads(leave_names)
+        
+    for name in leave_names:
+        frappe.db.set_value("Leave", name, "printed", 1)
+    
+    frappe.db.commit()
+    return {"status": "success"}
 
