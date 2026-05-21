@@ -14,15 +14,26 @@ def get_permission_query_conditions(user):
 	if "System Manager" in roles:
 		return ""
 
+	conditions = []
+
+	# University Employee or Leave Proxy Submitter should see leaves they own OR leaves where they are the target employee
+	if "University Employee" in roles or "Leave Proxy Submitter" in roles:
+		conditions.append(f"(`tabLeave`.employee = {frappe.db.escape(user)} OR `tabLeave`.owner = {frappe.db.escape(user)})")
+
 	if "Department Head" in roles:
 		departments = frappe.get_all("Leave Department", filters={"department_head": user}, pluck="name")
 		if departments:
 			departments_str = ", ".join([frappe.db.escape(d) for d in departments])
-			return f"`tabLeave`.dep IN ({departments_str})"
-		else:
-			return "1=0"
+			conditions.append(f"`tabLeave`.dep IN ({departments_str})")
 
-	return ""
+	if "Follow Up Employee" in roles or "HR Employee" in roles:
+		return ""
+
+	if conditions:
+		return " OR ".join(conditions)
+
+	return f"(`tabLeave`.employee = {frappe.db.escape(user)} OR `tabLeave`.owner = {frappe.db.escape(user)})"
+
 
 class Leave(Document):
 	def on_update(self):

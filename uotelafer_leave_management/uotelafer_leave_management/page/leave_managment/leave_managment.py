@@ -191,9 +191,17 @@ def get_departments():
     return frappe.get_all("Leave Department", fields=["name", "department_name"])
 
 
+def ensure_proxy_role_exists():
+    if not frappe.db.exists("Role", "Leave Proxy Submitter"):
+        role = frappe.new_doc("Role")
+        role.role_name = "Leave Proxy Submitter"
+        role.insert(ignore_permissions=True)
+
+
 @frappe.whitelist()
 def get_user_roles():
     """Get current user's roles relevant to this page"""
+    ensure_proxy_role_exists()
     user = frappe.session.user
     roles = frappe.get_roles(user)
     is_dept_head = False
@@ -206,8 +214,44 @@ def get_user_roles():
         "is_president": "University President" in roles,
         "is_follow_up": "Follow Up Employee" in roles,
         "is_admin": "System Manager" in roles,
+        "is_proxy_submitter": "Leave Proxy Submitter" in roles or "System Manager" in roles,
         "user": user,
     }
+
+
+@frappe.whitelist()
+def get_proxy_leaves(from_date=None, to_date=None, leave_type=None, status=None):
+    """Get leaves submitted by the current user on behalf of others"""
+    user = frappe.session.user
+    roles = frappe.get_roles(user)
+    if "Leave Proxy Submitter" not in roles and "System Manager" not in roles:
+        frappe.throw(_("Access Denied"))
+
+    filters = {"owner": user, "employee": ["!=", user]}
+
+    if from_date:
+        filters["from_date"] = [">=", from_date]
+    if to_date:
+        filters["to_date"] = ["<=", to_date]
+    if leave_type:
+        filters["leave_type"] = leave_type
+    if status and status != "All":
+        filters["workflow_state"] = status
+
+    leaves = frappe.get_all(
+        "Leave",
+        filters=filters,
+        fields=[
+            "name", "employee", "employee_fullname", "dep",
+            "leave_type", "original_leave", "from_date", "to_date", "days",
+            "reason", "workflow_state", "status",
+            "date_of_application", "alternative_employee",
+            "supervisor", "attachment", "personal_email"
+        ],
+        order_by="modified desc",
+        limit_page_length=100,
+    )
+    return leaves
 
 
 @frappe.whitelist()
@@ -227,20 +271,29 @@ def get_leave_comments(leave_name):
 
 
 @frappe.whitelist()
-def create_leave(leave_type, from_date, to_date, reason, dep, employee_fullname=None, alternative_employee=None, attachment=None, personal_email=None, original_leave=None):
+def create_leave(leave_type, from_date, to_date, reason, dep, employee=None, employee_fullname=None, alternative_employee=None, attachment=None, personal_email=None, original_leave=None):
     """Create a new leave request and apply the workflow"""
     user = frappe.session.user
 
-    if not employee_fullname:
+    # Determine target employee
+    target_employee = user
+    if employee and employee != user:
+        roles = frappe.get_roles(user)
+        if "Leave Proxy Submitter" in roles or "System Manager" in roles:
+            target_employee = employee
+        else:
+            frappe.throw(_("You are not authorized to submit leaves on behalf of other employees."))
+
+    if not employee_fullname or target_employee != user:
         # Get employee full name
-        employee_fullname = frappe.db.get_value("User", user, "full_name") or user
+        employee_fullname = frappe.db.get_value("User", target_employee, "full_name") or target_employee
         # Try to get from Leave Employee first
-        le_name = frappe.db.get_value("Leave Employee", user, "full_name")
+        le_name = frappe.db.get_value("Leave Employee", {"user": target_employee}, "full_name")
         if le_name:
             employee_fullname = le_name
 
     doc = frappe.new_doc("Leave")
-    doc.employee = user
+    doc.employee = target_employee
     doc.employee_fullname = employee_fullname
     doc.leave_type = leave_type
     doc.from_date = from_date
@@ -268,3 +321,4 @@ def create_leave(leave_type, from_date, to_date, reason, dep, employee_fullname=
         pass
 
     return doc.name
+
