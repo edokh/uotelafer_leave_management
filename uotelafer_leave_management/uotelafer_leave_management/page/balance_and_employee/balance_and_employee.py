@@ -14,13 +14,13 @@ def get_data(filters=None):
         user_filters["name"] = filters.get("user")
         
     # users
-    users = frappe.get_all("User", filters=user_filters, fields=["name", "full_name", "email"], order_by="name asc")
+    users = frappe.get_all("User", filters=user_filters, fields=["name", "full_name", "first_name", "middle_name", "last_name", "email"], order_by="name asc")
     
     # profiles
     emails = [u.email for u in users if u.email]
     profiles = {}
     if emails:
-        profile_docs = frappe.get_all("Profile", filters={"email": ["in", emails]}, fields=["email", "first_name", "second_name", "third_name", "family_name"])
+        profile_docs = frappe.get_all("Profile", filters={"email": ["in", emails], "cv_language": "Arabic"}, fields=["email", "first_name", "second_name", "third_name", "family_name"])
         for p in profile_docs:
             name_parts = [p.first_name, p.second_name, p.third_name, p.family_name]
             profiles[p.email] = " ".join([n for n in name_parts if n])
@@ -68,6 +68,9 @@ def get_data(filters=None):
         row = {
             "user": u.name,
             "user_full_name": u.full_name,
+            "first_name": u.first_name or "",
+            "middle_name": u.middle_name or "",
+            "last_name": u.last_name or "",
             "profile_full_name": p_name,
             "leave_employee_name": le_name,
             "leave_department": le_dept,
@@ -81,7 +84,7 @@ def get_data(filters=None):
     }
 
 @frappe.whitelist()
-def save_user_row(user, leave_employee_name, leave_department, balances):
+def save_user_row(user, leave_employee_name, leave_department, balances, first_name=None, middle_name=None, last_name=None):
     if isinstance(balances, str):
         balances = json.loads(balances)
         
@@ -90,6 +93,23 @@ def save_user_row(user, leave_employee_name, leave_department, balances):
     if leave_department == 'null' or leave_department is None:
         leave_department = ''
         
+    # Handle User Document fields
+    user_doc = frappe.get_doc("User", user)
+    user_changed = False
+    if first_name is not None and user_doc.first_name != first_name:
+        user_doc.first_name = first_name
+        user_changed = True
+    if middle_name is not None and user_doc.middle_name != middle_name:
+        user_doc.middle_name = middle_name
+        user_changed = True
+    if last_name is not None and user_doc.last_name != last_name:
+        user_doc.last_name = last_name
+        user_changed = True
+        
+    if user_changed:
+        user_doc.flags.ignore_permissions = True
+        user_doc.save(ignore_permissions=True)
+
     if not leave_employee_name and leave_department:
         # User specified department but no employee name. We default to User full name.
         leave_employee_name = frappe.get_value("User", user, "full_name") or user
@@ -101,7 +121,9 @@ def save_user_row(user, leave_employee_name, leave_department, balances):
         if leave_employee_name:
             current_name = frappe.get_value("Leave Employee", le, "full_name")
             if current_name != leave_employee_name:
-                frappe.rename_doc("Leave Employee", le, leave_employee_name, ignore_permissions=True)
+                frappe.flags.ignore_permissions = True
+                frappe.rename_doc("Leave Employee", le, leave_employee_name)
+                frappe.flags.ignore_permissions = False
                 frappe.db.set_value("Leave Employee", leave_employee_name, "full_name", leave_employee_name)
                 le = leave_employee_name
         
