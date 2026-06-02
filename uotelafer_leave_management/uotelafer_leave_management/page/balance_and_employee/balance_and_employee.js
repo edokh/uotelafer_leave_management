@@ -7,19 +7,64 @@ frappe.pages['balance-and-employee'].on_page_load = function(wrapper) {
 
 	page.set_indicator(__('Loading...'), 'orange');
 
-	frappe.call({
-		method: 'uotelafer_leave_management.uotelafer_leave_management.page.balance_and_employee.balance_and_employee.get_data',
-		callback: function(r) {
-			if(r.message) {
-				render_table(page, r.message);
-				page.set_indicator(__('Ready'), 'green');
-			}
-		}
+	// Setup Filters
+	page.add_field({
+		fieldname: 'user',
+		label: __('User'),
+		fieldtype: 'Link',
+		options: 'User',
+		change: function() { refresh(); }
 	});
+	page.add_field({
+		fieldname: 'leave_department',
+		label: __('Department'),
+		fieldtype: 'Link',
+		options: 'Leave Department',
+		change: function() { refresh(); }
+	});
+	page.add_field({
+		fieldname: 'leave_employee_name',
+		label: __('Leave Employee Name'),
+		fieldtype: 'Data',
+		change: function() { refresh(); }
+	});
+	page.add_field({
+		fieldname: 'profile_full_name',
+		label: __('Profile Name'),
+		fieldtype: 'Data',
+		change: function() { refresh(); }
+	});
+
+	let department_controls = {};
+
+	function refresh() {
+		let filters = {
+			user: page.fields_dict.user.get_value(),
+			leave_department: page.fields_dict.leave_department.get_value(),
+			leave_employee_name: page.fields_dict.leave_employee_name.get_value(),
+			profile_full_name: page.fields_dict.profile_full_name.get_value()
+		};
+
+		page.set_indicator(__('Loading...'), 'orange');
+		frappe.call({
+			method: 'uotelafer_leave_management.uotelafer_leave_management.page.balance_and_employee.balance_and_employee.get_data',
+			args: { filters: filters },
+			callback: function(r) {
+				if(r.message) {
+					render_table(page, r.message);
+					page.set_indicator(__('Ready'), 'green');
+				}
+			}
+		});
+	}
+
+	refresh();
 
 	function render_table(page, data) {
 		let leave_types = data.leave_types;
 		let users = data.users;
+
+		department_controls = {};
 
 		let table_html = `
 			<div class="table-responsive" style="margin: 15px;">
@@ -38,6 +83,7 @@ frappe.pages['balance-and-employee'].on_page_load = function(wrapper) {
 		});
 
 		table_html += `
+							<th>${__('Actions')}</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -50,24 +96,19 @@ frappe.pages['balance-and-employee'].on_page_load = function(wrapper) {
 					<td>${u.user_full_name}</td>
 					<td>${u.profile_full_name || ''}</td>
 					<td>
-						<input type="text" class="form-control input-sm update-field" 
+						<input type="text" class="form-control input-sm" 
 							data-field="leave_employee_name" 
 							value="${u.leave_employee_name || ''}"
 							placeholder="${__('Leave Employee Name')}">
 					</td>
-					<td>
-						<input type="text" class="form-control input-sm update-field" 
-							data-field="leave_department" 
-							value="${u.leave_department || ''}"
-							placeholder="${__('Department')}">
-					</td>
+					<td class="department-cell" data-user="${u.user}"></td>
 			`;
 
 			leave_types.forEach(lt => {
 				let balance = u.balances[lt] || 0.0;
 				table_html += `
 					<td>
-						<input type="number" class="form-control input-sm update-field text-right" 
+						<input type="number" class="form-control input-sm text-right" 
 							data-field="balance" 
 							data-leave-type="${lt}"
 							value="${balance}" step="any">
@@ -75,7 +116,14 @@ frappe.pages['balance-and-employee'].on_page_load = function(wrapper) {
 				`;
 			});
 
-			table_html += `</tr>`;
+			table_html += `
+					<td>
+						<button class="btn btn-primary btn-xs save-row" data-user="${u.user}">
+							${__('Save')}
+						</button>
+					</td>
+				</tr>
+			`;
 		});
 
 		table_html += `
@@ -86,28 +134,52 @@ frappe.pages['balance-and-employee'].on_page_load = function(wrapper) {
 
 		$(page.body).html(table_html);
 
-		// Bind change events
-		$(page.body).find('.update-field').on('change', function() {
-			let $input = $(this);
-			let user = $input.closest('tr').attr('data-user');
-			let field = $input.attr('data-field');
-			let value = $input.val();
-			let leave_type = $input.attr('data-leave-type') || null;
+		// Initialize department link fields
+		users.forEach(u => {
+			let td = $(page.body).find(`.department-cell[data-user="${u.user}"]`);
+			let control = frappe.ui.form.make_control({
+				parent: td,
+				df: {
+					fieldtype: 'Link',
+					options: 'Leave Department',
+					fieldname: 'leave_department',
+					only_input: true
+				},
+				render_input: true
+			});
+			control.set_value(u.leave_department);
+			department_controls[u.user] = control;
+		});
 
-			$input.prop('disabled', true);
+		// Bind save button events
+		$(page.body).find('.save-row').on('click', function() {
+			let btn = $(this);
+			let user = btn.attr('data-user');
+			let tr = btn.closest('tr');
+			
+			let leave_employee_name = tr.find('[data-field="leave_employee_name"]').val();
+			let leave_department = department_controls[user] ? department_controls[user].get_value() : '';
+			
+			let balances = {};
+			tr.find('[data-field="balance"]').each(function() {
+				let lt = $(this).attr('data-leave-type');
+				balances[lt] = $(this).val();
+			});
+
+			btn.prop('disabled', true);
 			frappe.call({
-				method: 'uotelafer_leave_management.uotelafer_leave_management.page.balance_and_employee.balance_and_employee.update_user_data',
+				method: 'uotelafer_leave_management.uotelafer_leave_management.page.balance_and_employee.balance_and_employee.save_user_row',
 				args: {
 					user: user,
-					field: field,
-					value: value,
-					leave_type: leave_type
+					leave_employee_name: leave_employee_name,
+					leave_department: leave_department,
+					balances: balances
 				},
 				callback: function(r) {
-					$input.prop('disabled', false);
+					btn.prop('disabled', false);
 					if(!r.exc) {
 						frappe.show_alert({
-							message: __('Updated successfully'),
+							message: __('Row for {0} saved successfully', [user]),
 							indicator: 'green'
 						});
 					}

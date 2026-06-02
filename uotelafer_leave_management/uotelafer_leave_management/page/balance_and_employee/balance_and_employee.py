@@ -1,10 +1,20 @@
 import frappe
 from frappe.utils import today
+import json
 
 @frappe.whitelist()
-def get_data():
+def get_data(filters=None):
+    if isinstance(filters, str):
+        filters = json.loads(filters)
+    else:
+        filters = filters or {}
+
+    user_filters = {"user_type": "System User"}
+    if filters.get("user"):
+        user_filters["name"] = filters.get("user")
+        
     # users
-    users = frappe.get_all("User", filters={"user_type": "System User"}, fields=["name", "full_name", "email"], order_by="name asc")
+    users = frappe.get_all("User", filters=user_filters, fields=["name", "full_name", "email"], order_by="name asc")
     
     # profiles
     emails = [u.email for u in users if u.email]
@@ -43,12 +53,24 @@ def get_data():
 
     data = []
     for u in users:
+        p_name = profiles.get(u.email, "")
+        le_name = leave_employees.get(u.name, {}).get("full_name", "")
+        le_dept = leave_employees.get(u.name, {}).get("leave_department", "")
+        
+        # Apply python-side filters for joined fields
+        if filters.get("profile_full_name") and filters.get("profile_full_name").lower() not in p_name.lower():
+            continue
+        if filters.get("leave_employee_name") and filters.get("leave_employee_name").lower() not in le_name.lower():
+            continue
+        if filters.get("leave_department") and filters.get("leave_department") != le_dept:
+            continue
+
         row = {
             "user": u.name,
             "user_full_name": u.full_name,
-            "profile_full_name": profiles.get(u.email, ""),
-            "leave_employee_name": leave_employees.get(u.name, {}).get("full_name", ""),
-            "leave_department": leave_employees.get(u.name, {}).get("leave_department", ""),
+            "profile_full_name": p_name,
+            "leave_employee_name": le_name,
+            "leave_department": le_dept,
             "balances": balances.get(u.name, {})
         }
         data.append(row)
@@ -59,81 +81,78 @@ def get_data():
     }
 
 @frappe.whitelist()
-def update_user_data(user, field, value, leave_type=None):
-    # Ensure value is parsed correctly for empty strings vs None
-    if value == 'null' or value is None:
-        value = ''
+def save_user_row(user, leave_employee_name, leave_department, balances):
+    if isinstance(balances, str):
+        balances = json.loads(balances)
         
-    if field == "leave_employee_name":
-        if not value:
-            frappe.throw("Leave Employee Name cannot be empty.")
-            
-        le = frappe.get_value("Leave Employee", {"user": user}, "name")
-        if le:
-            # Check if name is changing, maybe need to rename document? No, autoname is field:full_name. 
-            # In frappe, if we change a field that is used for autoname (and allow_rename is 1), 
-            # we should use frappe.rename_doc
+    if leave_employee_name == 'null' or leave_employee_name is None:
+        leave_employee_name = ''
+    if leave_department == 'null' or leave_department is None:
+        leave_department = ''
+        
+    if not leave_employee_name and leave_department:
+        # User specified department but no employee name. We default to User full name.
+        leave_employee_name = frappe.get_value("User", user, "full_name") or user
+
+    # Handle Leave Employee Document
+    le = frappe.get_value("Leave Employee", {"user": user}, "name")
+    if le:
+        # Update existing
+        if leave_employee_name:
             current_name = frappe.get_value("Leave Employee", le, "full_name")
-            if current_name != value:
-                frappe.rename_doc("Leave Employee", le, value, ignore_permissions=True)
-                # the rename changes both name and full_name (if it's tied) but let's be safe
-                frappe.db.set_value("Leave Employee", value, "full_name", value)
-        else:
+            if current_name != leave_employee_name:
+                frappe.rename_doc("Leave Employee", le, leave_employee_name, ignore_permissions=True)
+                frappe.db.set_value("Leave Employee", leave_employee_name, "full_name", leave_employee_name)
+                le = leave_employee_name
+        
+        frappe.db.set_value("Leave Employee", le, "leave_department", leave_department)
+    else:
+        # Create new
+        if leave_employee_name or leave_department:
+            if not leave_employee_name:
+                frappe.throw("Leave Employee Name is required to save department.")
             doc = frappe.get_doc({
                 "doctype": "Leave Employee",
                 "user": user,
-                "full_name": value
+                "full_name": leave_employee_name,
+                "leave_department": leave_department
             })
             doc.insert(ignore_permissions=True)
+
+    # Handle Balances
+    if balances:
+        for lt, new_balance_str in balances.items():
+            if new_balance_str == '':
+                new_balance = 0.0
+            else:
+                new_balance = float(new_balance_str)
                 
-    elif field == "leave_department":
-        le = frappe.get_value("Leave Employee", {"user": user}, "name")
-        if le:
-            frappe.db.set_value("Leave Employee", le, "leave_department", value)
-        else:
-            if value:
-                user_full_name = frappe.get_value("User", user, "full_name") or user
+            # Calculate current balance
+            txns = frappe.get_all("Leave Balance Transaction", 
+                                  filters={"employee": user, "leave_type": lt}, 
+                                  fields=["transaction_type", "balance"])
+            
+            current = 0.0
+            for t in txns:
+                if t.transaction_type == "Addition":
+                    current += t.balance
+                else:
+                    current -= t.balance
+                    
+            diff = new_balance - current
+            diff = round(diff, 2)
+            
+            if diff != 0:
                 doc = frappe.get_doc({
-                    "doctype": "Leave Employee",
-                    "user": user,
-                    "full_name": user_full_name,
-                    "leave_department": value
+                    "doctype": "Leave Balance Transaction",
+                    "employee": user,
+                    "leave_type": lt,
+                    "transaction_type": "Addition" if diff > 0 else "Consumption",
+                    "balance": abs(diff),
+                    "date": today(),
+                    "note": "Balance updated via Balance and Employee control panel"
                 })
                 doc.insert(ignore_permissions=True)
-                
-    elif field == "balance" and leave_type:
-        if value == '':
-            value = 0.0
-        new_balance = float(value)
-        
-        # Calculate current balance
-        txns = frappe.get_all("Leave Balance Transaction", 
-                              filters={"employee": user, "leave_type": leave_type}, 
-                              fields=["transaction_type", "balance"])
-        
-        current = 0.0
-        for t in txns:
-            if t.transaction_type == "Addition":
-                current += t.balance
-            else:
-                current -= t.balance
-                
-        diff = new_balance - current
-        
-        # We need to round to handle float imprecision
-        diff = round(diff, 2)
-        
-        if diff != 0:
-            doc = frappe.get_doc({
-                "doctype": "Leave Balance Transaction",
-                "employee": user,
-                "leave_type": leave_type,
-                "transaction_type": "Addition" if diff > 0 else "Consumption",
-                "balance": abs(diff),
-                "date": today(),
-                "note": "Balance updated via Balance and Employee control panel"
-            })
-            doc.insert(ignore_permissions=True)
 
     frappe.db.commit()
     return "success"
