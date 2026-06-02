@@ -580,9 +580,12 @@ class LeaveManagementPage {
 				<tr>
 					${checkbox_td}
 					<td><b>${row.employee_fullname || row.employee}</b></td>
-					<td>${row.leave_type}</td>
+					<td>
+						${row.leave_type}
+						${row.is_time_leave ? '<br><span style="font-size: 11px; padding: 2px 6px; background: #e0e7ff; color: #3730a3; border-radius: 4px;">إجازة زمنية</span>' : ''}
+					</td>
 					<td>${row.from_date}</td>
-					<td><b>${row.days}</b></td>
+					<td><b>${row.is_time_leave ? (row.number_of_hours + ' ساعات') : row.days}</b></td>
 					<td style="max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${row.reason || ''}">${reason_text}</td>
 					<td>${attachment_btn}</td>
 					<td>${status_badges}</td>
@@ -655,7 +658,7 @@ class LeaveManagementPage {
 			if (!dialog) return;
 			let from_date = dialog.get_value('from_date');
 			let to_date = dialog.get_value('to_date');
-			if (from_date && to_date) {
+			if (from_date && to_date && !dialog.get_value('is_time_leave')) {
 				dialog.get_field('days_display').$wrapper.find('#lm-days-number').text('جاري الحساب...');
 				frappe.call({
 					method: "uotelafer_leave_management.uotelafer_leave_management.doctype.leave.leave.calculate_leave_days",
@@ -732,6 +735,25 @@ class LeaveManagementPage {
 			{ fieldtype: 'Link', fieldname: 'dep', label: 'القسم', options: 'Leave Department', reqd: 1, default: this.last_dep },
 			{ fieldtype: 'Data', fieldname: 'personal_email', label: 'البريد الإلكتروني الشخصي', description: 'ايميل الاشعار', default: this.last_personal_email },
 			{ fieldtype: 'Column Break' },
+			{ fieldtype: 'Check', fieldname: 'is_time_leave', label: 'إجازة زمنية (بالساعات)', onchange: () => {
+				let val = dialog.get_value('is_time_leave');
+				if (val) {
+					dialog.set_df_property('number_of_hours', 'hidden', 0);
+					dialog.set_df_property('number_of_hours', 'reqd', 1);
+					dialog.set_df_property('to_date', 'hidden', 1);
+					dialog.set_df_property('to_date', 'reqd', 0);
+					dialog.get_field('days_display').$wrapper.hide();
+				} else {
+					dialog.set_df_property('number_of_hours', 'hidden', 1);
+					dialog.set_df_property('number_of_hours', 'reqd', 0);
+					dialog.set_value('number_of_hours', 0);
+					dialog.set_df_property('to_date', 'hidden', 0);
+					dialog.set_df_property('to_date', 'reqd', 1);
+					dialog.get_field('days_display').$wrapper.show();
+				}
+				update_days();
+			} },
+			{ fieldtype: 'Int', fieldname: 'number_of_hours', label: 'عدد الساعات', hidden: 1 },
 			{ fieldtype: 'Date', fieldname: 'from_date', label: 'من تاريخ', reqd: 1, default: frappe.datetime.add_days(frappe.datetime.nowdate(), 1), onchange: () => update_days() },
 			{ fieldtype: 'Date', fieldname: 'to_date', label: 'إلى تاريخ', reqd: 1, default: frappe.datetime.add_days(frappe.datetime.nowdate(), 1), onchange: () => update_days() },
 			{ fieldtype: 'Section Break' },
@@ -755,7 +777,9 @@ class LeaveManagementPage {
 						leave_type: values.leave_type,
 						original_leave: values.original_leave,
 						from_date: values.from_date,
-						to_date: values.to_date,
+						to_date: values.is_time_leave ? values.from_date : values.to_date,
+						is_time_leave: values.is_time_leave ? 1 : 0,
+						number_of_hours: values.number_of_hours || 0,
 						reason: values.reason,
 						dep: values.dep,
 						alternative_employee: values.alternative_employee,

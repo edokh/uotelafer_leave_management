@@ -1,7 +1,7 @@
 {%- set leave_type_name = frappe.db.get_value("Leave Type", doc.leave_type, "leave_type") if doc.leave_type else "" -%}
 {%- set dep_name = doc.dep or "" -%}
 {%- set supervisor_name = frappe.db.get_value("Leave Employee", {"user": doc.supervisor}, "full_name") if doc.supervisor else "" -%}
-{%- set qr_data_dict = { "id": doc.name, "emp": doc.employee_fullname or "", "from": doc.from_date|string, "to": doc.to_date|string, "days": doc.days|string, "status": doc.workflow_state or "Pending" } -%}
+{%- set qr_data_dict = { "id": doc.name, "emp": doc.employee_fullname or "", "type": leave_type_name or "", "from": doc.from_date|string, "to": doc.to_date|string, "days": doc.days|string, "status": doc.workflow_state or "Pending" } -%}
 {%- set qr_data = qr_data_dict | json -%}
 {%- set comments = frappe.get_all("Comment", filters={"reference_doctype": "Leave", "reference_name": doc.name, "comment_type": "Comment"}, fields=["comment_by", "content", "creation", "comment_type"], order_by="creation asc") -%}
 {%- set ws = doc.workflow_state or "Pending" -%}
@@ -33,8 +33,8 @@
     padding: 0;
   }
   .lp-logo {
-    height: 120px;
-    width: 120px;
+    height: 90px;
+    width: 90px;
     object-fit: contain;
   }
   .lp-univ-sub {
@@ -61,8 +61,8 @@
     margin-top: 4px;
   }
   .lp-qr-img {
-    width: 120px;
-    height: 120px;
+    width: 90px;
+    height: 90px;
     border: 1px solid #ddd;
     padding: 2px;
     border-radius: 4px;
@@ -283,15 +283,25 @@
   <!-- ═══ HEADER ═══ -->
   <table class="lp-head-table">
     <tr>
-      <td style="text-align: right; width: 35%; padding: 0;">
-        <img class="lp-logo" src="/assets/uotelafer_leave_management/logo.jpg">
+      <td style="text-align: right; width: 35%;">
+        <table>
+          <tr>
+            <td style="width: 100px;">
+              <img class="lp-logo" src="/assets/uotelafer_leave_management/logo.jpg">
+            </td>
+            <td style="padding-right: 10px;">
+              <div class="lp-univ-sub"> وزارة التعليم العالي</div>
+              <div class="lp-univ-main">جامعة تلعفر</div>
+            </td>
+          </tr>
+        </table>
       </td>
-      <td style="text-align: center; width: 30%; padding: 0; vertical-align: middle;">
+      <td style="text-align: center; width: 30%;">
         <div class="lp-title">استمارة الإجازة</div>
         <div class="lp-ref">{{ doc.name }}</div>
       </td>
-      <td style="text-align: left; width: 35%; padding: 0;">
-        <img class="lp-qr-img" src="{{ get_qr_code(qr_data) }}">
+      <td style="text-align: left; width: 35%;">
+        <img class="lp-qr-img" src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={{ qr_data | urlencode }}">
       </td>
     </tr>
   </table>
@@ -385,10 +395,10 @@
   <table class="lp-sig-table">
     <tr>
       <td>
-        <div class="lp-sig-hd">موافقة رئيس القسم</div>
+        <div class="lp-sig-hd">توقيع رئيس القسم</div>
         <div class="lp-sig-bd">
           {% if s_done %}
-          <span class="lp-digi-stamp lp-digi-stamp-pres">معتمد إلكترونياً</span>
+          <span class="lp-digi-stamp-pres">معتمد إلكترونياً</span>
           {% endif %}
         </div>
         <div class="lp-sig-ft">
@@ -397,10 +407,10 @@
         </div>
       </td>
       <td>
-        <div class="lp-sig-hd">موافقة رئيس الجامعة</div>
+        <div class="lp-sig-hd">توقيع رئيس الجامعة</div>
         <div class="lp-sig-bd">
           {% if p_done %}
-          <span class="lp-digi-stamp ">معتمد الكترونياً</span>
+          <span class="lp-digi-stamp lp-digi-stamp">معتمد الكترونياً</span>
           {% endif %}
         </div>
         <div class="lp-sig-ft">

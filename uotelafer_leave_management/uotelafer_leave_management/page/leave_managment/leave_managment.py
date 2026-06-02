@@ -23,6 +23,7 @@ def get_employee_leaves(from_date=None, to_date=None, leave_type=None, status=No
         fields=[
             "name", "employee", "employee_fullname", "dep",
             "leave_type", "original_leave", "from_date", "to_date", "days",
+            "is_time_leave", "number_of_hours",
             "reason", "workflow_state", "status",
             "date_of_application", "alternative_employee",
             "supervisor", "attachment", "personal_email"
@@ -71,6 +72,7 @@ def get_department_leaves(from_date=None, to_date=None, leave_type=None, status=
         fields=[
             "name", "employee", "employee_fullname", "dep",
             "leave_type", "original_leave", "from_date", "to_date", "days",
+            "is_time_leave", "number_of_hours",
             "reason", "workflow_state", "status",
             "date_of_application", "alternative_employee",
             "supervisor", "attachment", "personal_email"
@@ -107,6 +109,7 @@ def get_president_leaves(from_date=None, to_date=None, leave_type=None, status=N
         fields=[
             "name", "employee", "employee_fullname", "dep",
             "leave_type", "original_leave", "from_date", "to_date", "days",
+            "is_time_leave", "number_of_hours",
             "reason", "workflow_state", "status",
             "date_of_application", "alternative_employee",
             "supervisor", "attachment", "personal_email"
@@ -160,6 +163,7 @@ def get_all_leaves(from_date=None, to_date=None, leave_type=None, status=None, d
         fields=[
             "name", "employee", "employee_fullname", "dep",
             "leave_type", "original_leave", "from_date", "to_date", "days",
+            "is_time_leave", "number_of_hours",
             "reason", "workflow_state", "status",
             "date_of_application", "alternative_employee",
             "supervisor", "attachment", "personal_email", "printed"
@@ -249,6 +253,7 @@ def get_proxy_leaves(from_date=None, to_date=None, leave_type=None, status=None)
         fields=[
             "name", "employee", "employee_fullname", "dep",
             "leave_type", "original_leave", "from_date", "to_date", "days",
+            "is_time_leave", "number_of_hours",
             "reason", "workflow_state", "status",
             "date_of_application", "alternative_employee",
             "supervisor", "attachment", "personal_email"
@@ -276,7 +281,7 @@ def get_leave_comments(leave_name):
 
 
 @frappe.whitelist()
-def create_leave(leave_type, from_date, to_date, reason, dep, employee=None, employee_fullname=None, alternative_employee=None, attachment=None, personal_email=None, original_leave=None):
+def create_leave(leave_type, from_date, to_date, reason, dep, employee=None, employee_fullname=None, alternative_employee=None, attachment=None, personal_email=None, original_leave=None, is_time_leave=0, number_of_hours=0):
     """Create a new leave request and apply the workflow"""
     user = frappe.session.user
 
@@ -303,6 +308,8 @@ def create_leave(leave_type, from_date, to_date, reason, dep, employee=None, emp
     doc.leave_type = leave_type
     doc.from_date = from_date
     doc.to_date = to_date
+    doc.is_time_leave = int(is_time_leave)
+    doc.number_of_hours = int(number_of_hours)
     doc.reason = reason
     doc.dep = dep
     doc.date_of_application = frappe.utils.today()

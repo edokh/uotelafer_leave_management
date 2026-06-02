@@ -34,9 +34,6 @@ fixtures = [
         "dt": "Leave Type"
     },
     {
-        "dt": "Leave Department"
-    },
-    {
         "dt": "Role",
         "filters": [["name", "in", ["University Employee", "University President", "Department Head", "Follow Up Employee", "HR Employee"]]]
     }

@@ -16,6 +16,8 @@
   "from_date",
   "to_date",
   "days",
+  "is_time_leave",
+  "number_of_hours",
   "column_break_fhww",
   "supervisor",
   "supervisor_personal_email",
@@ -212,12 +214,23 @@
    "fieldname": "printed",
    "fieldtype": "Check",
    "label": "Printed"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_time_leave",
+   "fieldtype": "Check",
+   "label": "Is Time Leave"
+  },
+  {
+   "fieldname": "number_of_hours",
+   "fieldtype": "Int",
+   "label": "Number of Hours"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-05-18 08:45:53.045069",
+ "modified": "2026-06-02 13:33:44.902097",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave",

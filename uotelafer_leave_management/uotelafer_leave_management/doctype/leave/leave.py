@@ -69,7 +69,10 @@ class Leave(Document):
 		"""Validate and calculate leave days, excluding holidays and weekends"""
 		# Calculate days first (excluding holidays and weekends)
 		if self.from_date and self.to_date:
-			self.days = calculate_leave_days(self.from_date, self.to_date)
+			if self.is_time_leave:
+				self.days = 0
+			else:
+				self.days = calculate_leave_days(self.from_date, self.to_date)
 		
 		# If this is a Cancellation request
 		if self.leave_type == "إلغاء إجازة":
@@ -117,7 +120,7 @@ class Leave(Document):
 			check_overlapping_leaves(self.employee, self.from_date, self.to_date, self.name)
 		
 		# Validate that the employee has sufficient leave balance if the type requires it
-		if self.employee and self.leave_type and self.days:
+		if self.employee and self.leave_type and (self.days > 0 or self.is_time_leave):
 			has_balance = frappe.db.get_value("Leave Type", self.leave_type, "has_balance")
 			
 			if has_balance:
@@ -126,11 +129,12 @@ class Leave(Document):
 				total_balance = balance_info.get("total_balance", 0)
 				
 				# Check if balance is sufficient
-				if total_balance < self.days:
+				required_balance = (self.number_of_hours / 7.0) if self.is_time_leave else self.days
+				if total_balance < required_balance:
 					frappe.throw(
-						_("Insufficient leave balance for {0}. Requested: {1} days, Available: {2} days").format(
+						_("Insufficient leave balance for {0}. Requested: {1}, Available: {2} days").format(
 							self.leave_type,
-							self.days,
+							f"{self.number_of_hours} hours" if self.is_time_leave else f"{self.days} days",
 							total_balance
 						)
 					)
@@ -142,7 +146,7 @@ class Leave(Document):
 
 	def on_submit(self):
 		"""Create a Leave Balance Transaction after submission"""
-		if not self.days:
+		if not self.days and not self.is_time_leave:
 			return
 
 		if self.leave_type == "إلغاء إجازة":
@@ -156,7 +160,7 @@ class Leave(Document):
 			transaction.employee = self.employee
 			transaction.leave_type = original_leave_doc.leave_type
 			transaction.transaction_type = "Addition"
-			transaction.balance = self.days
+			transaction.balance = (original_leave_doc.number_of_hours / 7.0) if original_leave_doc.is_time_leave else self.days
 			transaction.date = frappe.utils.today()
 			transaction.note = f"Addition from Leave Cancellation {self.name} (Original Leave: {self.original_leave})"
 			transaction.insert(ignore_permissions=True)
@@ -172,7 +176,7 @@ class Leave(Document):
 			transaction.employee = self.employee
 			transaction.leave_type = self.leave_type
 			transaction.transaction_type = "Consumption"
-			transaction.balance = self.days
+			transaction.balance = (self.number_of_hours / 7.0) if self.is_time_leave else self.days
 			transaction.date = frappe.utils.today()
 			transaction.note = f"Consumption from Leave {self.name}"
 			transaction.insert(ignore_permissions=True)
@@ -233,7 +237,7 @@ def get_all_leave_balances(employee, current_leave_name=None):
 		leave_applications = frappe.get_all(
 			"Leave",
 			filters=filters,
-			fields=["days", "status", "name"]
+			fields=["days", "status", "name", "is_time_leave", "number_of_hours"]
 		)
 		
 		# Sum all days from leaves and subtract from balance
@@ -242,7 +246,10 @@ def get_all_leave_balances(employee, current_leave_name=None):
 			status = application.get("status")
 			# Count leaves that are not Rejected
 			if status != "Rejected":
-				taken_days += application.get("days", 0)
+				if application.get("is_time_leave"):
+					taken_days += (application.get("number_of_hours", 0) / 7.0)
+				else:
+					taken_days += application.get("days", 0)
 		
 		total_balance -= taken_days
 		
@@ -291,7 +298,7 @@ def get_leave_balance(employee, leave_type, current_leave_name=None):
 	leave_applications = frappe.get_all(
 		"Leave",
 		filters=filters,
-		fields=["days","status"]
+		fields=["days", "status", "is_time_leave", "number_of_hours"]
 	)
 	
 	# Sum all days from leaves and subtract from balance
@@ -300,7 +307,10 @@ def get_leave_balance(employee, leave_type, current_leave_name=None):
 		status = application.get("status")
 		# Count leaves that are not Rejected
 		if status != "Rejected":
-			taken_days += application.get("days", 0)
+			if application.get("is_time_leave"):
+				taken_days += (application.get("number_of_hours", 0) / 7.0)
+			else:
+				taken_days += application.get("days", 0)
 	
 	total_balance -= taken_days
 	return {'total_balance': total_balance, 'applications': leave_applications}
