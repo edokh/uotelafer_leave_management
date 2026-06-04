@@ -130,6 +130,19 @@ def get_all_leaves(from_date=None, to_date=None, leave_type=None, status=None, d
         frappe.throw(_("Access Denied"))
 
     filters = {}
+
+    # Filter by formation for HR/Follow Up employees
+    if "System Manager" not in roles:
+        leave_emp = frappe.db.get_value("Leave Employee", {"user": user}, "leave_department")
+        if leave_emp:
+            formation = frappe.db.get_value("Leave Department", leave_emp, "formation")
+            if formation:
+                allowed_departments = frappe.get_all("Leave Department", filters={"formation": formation}, pluck="name")
+                if allowed_departments:
+                    filters["dep"] = ["in", allowed_departments]
+                else:
+                    return []
+
     if from_date:
         filters["from_date"] = [">=", from_date]
     if to_date:
@@ -148,7 +161,13 @@ def get_all_leaves(from_date=None, to_date=None, leave_type=None, status=None, d
         filters["workflow_state"] = ["in", ["Pending", "Applied", "Approved By Department", "Approved"]]
         
     if dep:
-        filters["dep"] = dep
+        if "dep" in filters and isinstance(filters["dep"], list) and filters["dep"][0] == "in":
+            if dep in filters["dep"][1]:
+                filters["dep"] = dep
+            else:
+                return [] # Dep requested not in allowed
+        else:
+            filters["dep"] = dep
     if employee_name:
         filters["employee"] = employee_name
 
@@ -197,7 +216,37 @@ def get_leave_types():
 @frappe.whitelist()
 def get_departments():
     """Get all departments"""
-    return frappe.get_all("Leave Department", fields=["name", "department_name"])
+    user = frappe.session.user
+    roles = frappe.get_roles(user)
+    filters = {}
+    
+    if "System Manager" not in roles and ("HR Employee" in roles or "Follow Up Employee" in roles):
+        leave_emp = frappe.db.get_value("Leave Employee", {"user": user}, "leave_department")
+        if leave_emp:
+            formation = frappe.db.get_value("Leave Department", leave_emp, "formation")
+            if formation:
+                filters["formation"] = formation
+
+    return frappe.get_all("Leave Department", filters=filters, fields=["name", "department_name"])
+
+
+@frappe.whitelist()
+def get_leave_employees():
+    """Get all employees, filtered by formation if applicable"""
+    user = frappe.session.user
+    roles = frappe.get_roles(user)
+    filters = {}
+    
+    if "System Manager" not in roles and ("HR Employee" in roles or "Follow Up Employee" in roles):
+        leave_emp = frappe.db.get_value("Leave Employee", {"user": user}, "leave_department")
+        if leave_emp:
+            formation = frappe.db.get_value("Leave Department", leave_emp, "formation")
+            if formation:
+                allowed_departments = frappe.get_all("Leave Department", filters={"formation": formation}, pluck="name")
+                if allowed_departments:
+                    filters["leave_department"] = ["in", allowed_departments]
+
+    return frappe.get_all("Leave Employee", filters=filters, fields=["name", "full_name"], limit_page_length=0)
 
 
 def ensure_proxy_role_exists():

@@ -8,6 +8,7 @@
  "engine": "InnoDB",
  "field_order": [
   "department_name",
+  "formation",
   "department_head",
   "department_head_name",
   "department_head_personal_email"
@@ -18,6 +19,14 @@
    "fieldtype": "Data",
    "label": "Department Name",
    "unique": 1
+  },
+  {
+   "fieldname": "formation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Formation",
+   "options": "Leave Formation",
+   "reqd": 1
   },
   {
    "fieldname": "department_head",

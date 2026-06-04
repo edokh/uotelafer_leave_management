@@ -58,7 +58,7 @@ class LeaveManagementPage {
 		let [dept_res, type_res, emp_res] = await Promise.all([
 			frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_departments" }),
 			frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_leave_types" }),
-			frappe.call({ method: "frappe.client.get_list", args: { doctype: "Leave Employee", fields: ["name", "full_name"], limit_page_length: 0 } })
+			frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_leave_employees" })
 		]);
 		this.departments = dept_res.message || [];
 		this.leave_types = type_res.message || [];
