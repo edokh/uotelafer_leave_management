@@ -40,7 +40,10 @@ def get_department_leaves(from_date=None, to_date=None, leave_type=None, status=
     user = frappe.session.user
     roles = frappe.get_roles(user)
 
-    if "Department Head" not in roles and "System Manager" not in roles:
+    settings = frappe.get_cached_doc("Leave Settings")
+    dept_head_role = settings.department_head_role or "Department Head"
+
+    if dept_head_role not in roles and "System Manager" not in roles:
         frappe.throw(_("Access Denied"))
 
     # Get departments this user heads
@@ -89,10 +92,21 @@ def get_president_leaves(from_date=None, to_date=None, leave_type=None, status=N
     user = frappe.session.user
     roles = frappe.get_roles(user)
 
-    if "University President" not in roles and "System Manager" not in roles:
+    settings = frappe.get_cached_doc("Leave Settings")
+    pres_role = settings.presidant_role or "University President"
+    pres_office_role = settings.presidant_office_role or "Presidant Office"
+
+    is_pres = pres_role in roles or "System Manager" in roles
+    is_office = pres_office_role in roles
+
+    if not is_pres and not is_office:
         frappe.throw(_("Access Denied"))
 
     filters = {}
+
+    if not is_pres and is_office:
+        max_days = settings.number_of_days_for_presidant_approval or 3
+        filters["days"] = ["<=", max_days]
 
     if from_date:
         filters["from_date"] = [">=", from_date]
@@ -126,7 +140,10 @@ def get_all_leaves(from_date=None, to_date=None, leave_type=None, status=None, d
     user = frappe.session.user
     roles = frappe.get_roles(user)
 
-    if "Follow Up Employee" not in roles and "HR Employee" not in roles and "System Manager" not in roles:
+    settings = frappe.get_cached_doc("Leave Settings")
+    hr_role = settings.hr_employee_role or "HR Employee"
+
+    if "Follow Up Employee" not in roles and hr_role not in roles and "System Manager" not in roles:
         frappe.throw(_("Access Denied"))
 
     filters = {}
@@ -201,8 +218,35 @@ def apply_workflow_action(leave_name, action, comment=None):
     if comment:
         doc.add_comment("Comment", comment)
 
-    frappe.model.workflow.apply_workflow(doc, action)
-    doc.save(ignore_permissions=True)
+    user = frappe.session.user
+    roles = frappe.get_roles(user)
+    settings = frappe.get_cached_doc("Leave Settings")
+
+    if doc.workflow_state == "Applied" and action in ["Approve", "Reject"]:
+        dept_head_role = settings.department_head_role or "Department Head"
+        if dept_head_role not in roles and "System Manager" not in roles:
+            frappe.throw(_("Only Department Heads can approve leaves at this stage."))
+
+    elif doc.workflow_state == "Approved By Department" and action in ["Approve", "Reject"]:
+        pres_role = settings.presidant_role or "University President"
+        pres_office_role = settings.presidant_office_role or "Presidant Office"
+        max_days = settings.number_of_days_for_presidant_approval or 3
+
+        is_pres = pres_role in roles or "System Manager" in roles
+        is_office = pres_office_role in roles
+
+        if doc.days > max_days and not is_pres:
+            frappe.throw(_("Only the University President can approve leaves longer than {0} days").format(max_days))
+        
+        if not is_pres and not is_office:
+            frappe.throw(_("Access Denied for Presidency approval"))
+
+    frappe.set_user("Administrator")
+    try:
+        frappe.model.workflow.apply_workflow(doc, action)
+        doc.save(ignore_permissions=True)
+    finally:
+        frappe.set_user(user)
 
     return {"status": "success", "new_state": doc.workflow_state}
 
@@ -220,7 +264,10 @@ def get_departments():
     roles = frappe.get_roles(user)
     filters = {}
     
-    if "System Manager" not in roles and ("HR Employee" in roles or "Follow Up Employee" in roles):
+    settings = frappe.get_cached_doc("Leave Settings")
+    hr_role = settings.hr_employee_role or "HR Employee"
+
+    if "System Manager" not in roles and (hr_role in roles or "Follow Up Employee" in roles):
         leave_emp = frappe.db.get_value("Leave Employee", {"user": user}, "leave_department")
         if leave_emp:
             formation = frappe.db.get_value("Leave Department", leave_emp, "formation")
@@ -237,7 +284,10 @@ def get_leave_employees():
     roles = frappe.get_roles(user)
     filters = {}
     
-    if "System Manager" not in roles and ("HR Employee" in roles or "Follow Up Employee" in roles):
+    settings = frappe.get_cached_doc("Leave Settings")
+    hr_role = settings.hr_employee_role or "HR Employee"
+
+    if "System Manager" not in roles and (hr_role in roles or "Follow Up Employee" in roles):
         leave_emp = frappe.db.get_value("Leave Employee", {"user": user}, "leave_department")
         if leave_emp:
             formation = frappe.db.get_value("Leave Department", leave_emp, "formation")
@@ -263,14 +313,22 @@ def get_user_roles():
     user = frappe.session.user
     roles = frappe.get_roles(user)
     is_dept_head = False
-    if "Department Head" in roles:
+
+    settings = frappe.get_single("Leave Settings")
+    dept_head_role = settings.department_head_role or "Department Head"
+    pres_role = settings.presidant_role or "University President"
+    pres_office_role = settings.presidant_office_role or "Presidant Office"
+    hr_role = settings.hr_employee_role or "HR Employee"
+
+    if dept_head_role in roles:
         is_dept_head = bool(frappe.db.exists("Leave Department", {"department_head": user}))
 
     return {
         "is_employee": "University Employee" in roles,
         "is_dept_head": is_dept_head,
-        "is_president": "University President" in roles,
-        "is_follow_up": "Follow Up Employee" in roles or "HR Employee" in roles or "System Manager" in roles,
+        "is_president": pres_role in roles,
+        "is_president_office": pres_office_role in roles,
+        "is_follow_up": "Follow Up Employee" in roles or hr_role in roles or "System Manager" in roles,
         "is_admin": "System Manager" in roles,
         "is_proxy_submitter": "Leave Proxy Submitter" in roles or "System Manager" in roles,
         "user": user,

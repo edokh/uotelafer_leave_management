@@ -65,9 +65,9 @@ class LeaveManagementPage {
 		this.leave_employees = emp_res.message || [];
 
 		// Determine default tab
-		if (this.user_roles.is_follow_up && !this.user_roles.is_employee && !this.user_roles.is_president && !this.user_roles.is_dept_head) {
+		if (this.user_roles.is_follow_up && !this.user_roles.is_employee && !this.user_roles.is_president && !this.user_roles.is_president_office && !this.user_roles.is_dept_head) {
 			this.current_tab = 'follow_up_leaves';
-		} else if (this.user_roles.is_president && !this.user_roles.is_employee) {
+		} else if ((this.user_roles.is_president || this.user_roles.is_president_office) && !this.user_roles.is_employee) {
 			this.current_tab = 'president_leaves';
 		} else if (this.user_roles.is_dept_head && !this.user_roles.is_employee) {
 			this.current_tab = 'department_leaves';
@@ -107,7 +107,7 @@ class LeaveManagementPage {
 					${this.user_roles.is_employee ? `<button class="lm-tab ${this.current_tab === 'my_leaves' ? 'active' : ''}" data-tab="my_leaves">إجازاتي</button>` : ''}
 					${this.user_roles.is_proxy_submitter ? `<button class="lm-tab ${this.current_tab === 'proxy_leaves' ? 'active' : ''}" data-tab="proxy_leaves">التقديم بالنيابة</button>` : ''}
 					${this.user_roles.is_dept_head || this.user_roles.is_admin ? `<button class="lm-tab ${this.current_tab === 'department_leaves' ? 'active' : ''}" data-tab="department_leaves">إجازات القسم</button>` : ''}
-					${this.user_roles.is_president || this.user_roles.is_admin ? `<button class="lm-tab ${this.current_tab === 'president_leaves' ? 'active' : ''}" data-tab="president_leaves">موافقات رئيس الجامعة</button>` : ''}
+					${this.user_roles.is_president || this.user_roles.is_president_office || this.user_roles.is_admin ? `<button class="lm-tab ${this.current_tab === 'president_leaves' ? 'active' : ''}" data-tab="president_leaves">موافقات الرئاسة</button>` : ''}
 					${this.user_roles.is_follow_up || this.user_roles.is_admin ? `<button class="lm-tab ${this.current_tab === 'follow_up_leaves' ? 'active' : ''}" data-tab="follow_up_leaves">متابعة الإجازات</button>` : ''}
 				</div>
 

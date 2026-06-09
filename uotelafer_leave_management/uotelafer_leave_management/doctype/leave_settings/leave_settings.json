@@ -1,0 +1,72 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-06-07 13:46:07.701435",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "department_head_role",
+  "presidant_office_role",
+  "presidant_role",
+  "hr_employee_role",
+  "number_of_days_for_presidant_approval"
+ ],
+ "fields": [
+  {
+   "fieldname": "department_head_role",
+   "fieldtype": "Link",
+   "label": "Department Head Role",
+   "options": "Role"
+  },
+  {
+   "fieldname": "presidant_office_role",
+   "fieldtype": "Link",
+   "label": "Presidant Office Role",
+   "options": "Role"
+  },
+  {
+   "fieldname": "presidant_role",
+   "fieldtype": "Link",
+   "label": "Presidant Role",
+   "options": "Role"
+  },
+  {
+   "default": "3",
+   "fieldname": "number_of_days_for_presidant_approval",
+   "fieldtype": "Int",
+   "label": "Number of Days For Presidant approval"
+  },
+  {
+   "fieldname": "hr_employee_role",
+   "fieldtype": "Link",
+   "label": "HR Employee Role",
+   "options": "Role"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-07 13:49:44.796862",
+ "modified_by": "Administrator",
+ "module": "Uotelafer Leave Management",
+ "name": "Leave Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

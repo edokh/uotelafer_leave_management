@@ -29,7 +29,7 @@ def get_data(filters=None):
     user_names = [u.name for u in users]
     leave_employees = {}
     if user_names:
-        le_docs = frappe.get_all("Leave Employee", filters={"user": ["in", user_names]}, fields=["name", "user", "full_name", "leave_department"])
+        le_docs = frappe.get_all("Leave Employee", filters={"user": ["in", user_names]}, fields=["name", "user", "full_name", "leave_department", "type"])
         for le in le_docs:
             leave_employees[le.user] = le
             
@@ -56,6 +56,7 @@ def get_data(filters=None):
         p_name = profiles.get(u.email, "")
         le_name = leave_employees.get(u.name, {}).get("full_name", "")
         le_dept = leave_employees.get(u.name, {}).get("leave_department", "")
+        le_type = leave_employees.get(u.name, {}).get("type", "")
         
         # Apply python-side filters for joined fields
         if filters.get("profile_full_name") and filters.get("profile_full_name").lower() not in p_name.lower():
@@ -63,6 +64,8 @@ def get_data(filters=None):
         if filters.get("leave_employee_name") and filters.get("leave_employee_name").lower() not in le_name.lower():
             continue
         if filters.get("leave_department") and filters.get("leave_department") != le_dept:
+            continue
+        if filters.get("leave_employee_type") and filters.get("leave_employee_type") != le_type:
             continue
 
         row = {
@@ -74,6 +77,7 @@ def get_data(filters=None):
             "profile_full_name": p_name,
             "leave_employee_name": le_name,
             "leave_department": le_dept,
+            "leave_employee_type": le_type,
             "balances": balances.get(u.name, {})
         }
         data.append(row)
@@ -82,9 +86,9 @@ def get_data(filters=None):
         "users": data,
         "leave_types": [lt.name for lt in leave_types]
     }
-
+ 
 @frappe.whitelist()
-def save_user_row(user, leave_employee_name, leave_department, balances, first_name=None, middle_name=None, last_name=None):
+def save_user_row(user, leave_employee_name, leave_department, balances, first_name=None, middle_name=None, last_name=None, leave_employee_type=None):
     if isinstance(balances, str):
         balances = json.loads(balances)
         
@@ -92,6 +96,8 @@ def save_user_row(user, leave_employee_name, leave_department, balances, first_n
         leave_employee_name = ''
     if leave_department == 'null' or leave_department is None:
         leave_department = ''
+    if leave_employee_type == 'null' or leave_employee_type is None:
+        leave_employee_type = ''
         
     # Handle User Document fields
     user_doc = frappe.get_doc("User", user)
@@ -109,11 +115,11 @@ def save_user_row(user, leave_employee_name, leave_department, balances, first_n
     if user_changed:
         user_doc.flags.ignore_permissions = True
         user_doc.save(ignore_permissions=True)
-
-    if not leave_employee_name and leave_department:
-        # User specified department but no employee name. We default to User full name.
+ 
+    if not leave_employee_name and (leave_department or leave_employee_type):
+        # User specified department/type but no employee name. We default to User full name.
         leave_employee_name = frappe.get_value("User", user, "full_name") or user
-
+ 
     # Handle Leave Employee Document
     le = frappe.get_value("Leave Employee", {"user": user}, "name")
     if le:
@@ -128,16 +134,18 @@ def save_user_row(user, leave_employee_name, leave_department, balances, first_n
                 le = leave_employee_name
         
         frappe.db.set_value("Leave Employee", le, "leave_department", leave_department)
+        frappe.db.set_value("Leave Employee", le, "type", leave_employee_type)
     else:
         # Create new
-        if leave_employee_name or leave_department:
+        if leave_employee_name or leave_department or leave_employee_type:
             if not leave_employee_name:
-                frappe.throw("Leave Employee Name is required to save department.")
+                frappe.throw("Leave Employee Name is required to save.")
             doc = frappe.get_doc({
                 "doctype": "Leave Employee",
                 "user": user,
                 "full_name": leave_employee_name,
-                "leave_department": leave_department
+                "leave_department": leave_department,
+                "type": leave_employee_type
             })
             doc.insert(ignore_permissions=True)
 
