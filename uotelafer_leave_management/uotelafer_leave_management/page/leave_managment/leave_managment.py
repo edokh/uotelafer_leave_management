@@ -235,11 +235,14 @@ def apply_workflow_action(leave_name, action, comment=None):
         is_pres = pres_role in roles or "System Manager" in roles
         is_office = pres_office_role in roles
 
-        if doc.days > max_days and not is_pres:
+        # Check if user has the single-approval approver_role for this leave's formation
+        is_single_approver = _is_user_single_approver_for_leave(user, roles, doc)
+
+        if not is_pres and not is_office and not is_single_approver:
+            frappe.throw(_("Access Denied for approval"))
+
+        if doc.days > max_days and not is_pres and not is_single_approver:
             frappe.throw(_("Only the University President can approve leaves longer than {0} days").format(max_days))
-        
-        if not is_pres and not is_office:
-            frappe.throw(_("Access Denied for Presidency approval"))
 
     frappe.set_user("Administrator")
     try:
@@ -323,6 +326,20 @@ def get_user_roles():
     if dept_head_role in roles:
         is_dept_head = bool(frappe.db.exists("Leave Department", {"department_head": user}))
 
+    # Check if user has any single-approval approver_role
+    is_single_approver = False
+    single_approver_role = None
+    single_approval_formations = frappe.get_all(
+        "Leave Formation",
+        filters={"single_approval": 1, "approver_role": ["is", "set"]},
+        fields=["name", "approver_role"]
+    )
+    for f in single_approval_formations:
+        if f.approver_role in roles:
+            is_single_approver = True
+            single_approver_role = f.approver_role
+            break
+
     return {
         "is_employee": "University Employee" in roles,
         "is_dept_head": is_dept_head,
@@ -331,6 +348,8 @@ def get_user_roles():
         "is_follow_up": "Follow Up Employee" in roles or hr_role in roles or "System Manager" in roles,
         "is_admin": "System Manager" in roles,
         "is_proxy_submitter": "Leave Proxy Submitter" in roles or "System Manager" in roles,
+        "is_single_approver": is_single_approver or "System Manager" in roles,
+        "single_approver_role": single_approver_role,
         "user": user,
     }
 
@@ -388,7 +407,7 @@ def get_leave_comments(leave_name):
 
 
 @frappe.whitelist()
-def create_leave(leave_type, from_date, to_date, reason, dep, employee=None, employee_fullname=None, alternative_employee=None, attachment=None, personal_email=None, original_leave=None, is_time_leave=0, number_of_hours=0):
+def create_leave(leave_type, from_date, to_date, reason, dep, employee=None, employee_fullname=None, alternative_employee=None, attachment=None, personal_email=None, original_leave=None, is_time_leave=0, number_of_hours=0, from_time=None, to_time=None):
     """Create a new leave request and apply the workflow"""
     user = frappe.session.user
 
@@ -417,6 +436,10 @@ def create_leave(leave_type, from_date, to_date, reason, dep, employee=None, emp
     doc.to_date = to_date
     doc.is_time_leave = int(is_time_leave)
     doc.number_of_hours = int(number_of_hours)
+    if from_time:
+        doc.from_time = from_time
+    if to_time:
+        doc.to_time = to_time
     doc.reason = reason
     doc.dep = dep
     doc.date_of_application = frappe.utils.today()
@@ -438,6 +461,26 @@ def create_leave(leave_type, from_date, to_date, reason, dep, employee=None, emp
         doc.save(ignore_permissions=True)
     except Exception:
         pass
+
+    # Auto-advance for single-approval formations:
+    # If the employee's department belongs to a formation with single_approval=1,
+    # automatically approve at department level
+    if doc.workflow_state == "Applied" and doc.dep:
+        try:
+            formation = frappe.db.get_value("Leave Department", doc.dep, "formation")
+            if formation:
+                is_single = frappe.db.get_value("Leave Formation", formation, "single_approval")
+                if is_single:
+                    frappe.set_user("Administrator")
+                    try:
+                        frappe.model.workflow.apply_workflow(doc, "Approve")
+                        doc.date_of_supervisor_action = frappe.utils.today()
+                        doc.save(ignore_permissions=True)
+                        doc.add_comment("Comment", "تمت الموافقة التلقائية من القسم - نظام الموافقة الواحدة")
+                    finally:
+                        frappe.set_user(user)
+        except Exception:
+            pass
 
     return doc.name
 
@@ -477,4 +520,84 @@ def mark_leaves_as_printed(leave_names):
     
     frappe.db.commit()
     return {"status": "success"}
+
+
+def _is_user_single_approver_for_leave(user, roles, leave_doc):
+    """Check if user has the approver_role for the leave's formation (single_approval mode)"""
+    if not leave_doc.dep:
+        return False
+
+    formation = frappe.db.get_value("Leave Department", leave_doc.dep, "formation")
+    if not formation:
+        return False
+
+    formation_doc = frappe.get_cached_doc("Leave Formation", formation)
+    if not formation_doc.single_approval or not formation_doc.approver_role:
+        return False
+
+    return formation_doc.approver_role in roles
+
+
+@frappe.whitelist()
+def get_single_approval_leaves(from_date=None, to_date=None, leave_type=None, status=None):
+    """Get leaves awaiting final approval from single-approval formations"""
+    user = frappe.session.user
+    roles = frappe.get_roles(user)
+
+    # Find all single-approval formations where the user has the approver_role
+    formations = frappe.get_all(
+        "Leave Formation",
+        filters={"single_approval": 1, "approver_role": ["is", "set"]},
+        fields=["name", "approver_role"]
+    )
+
+    allowed_formations = []
+    for f in formations:
+        if f.approver_role in roles or "System Manager" in roles:
+            allowed_formations.append(f.name)
+
+    if not allowed_formations:
+        return []
+
+    # Get departments belonging to these formations
+    departments = frappe.get_all(
+        "Leave Department",
+        filters={"formation": ["in", allowed_formations]},
+        pluck="name"
+    )
+
+    if not departments:
+        return []
+
+    filters = {
+        "dep": ["in", departments]
+    }
+
+    if from_date:
+        filters["from_date"] = [">=", from_date]
+    if to_date:
+        filters["to_date"] = ["<=", to_date]
+    if leave_type:
+        filters["leave_type"] = leave_type
+    if status and status != "All":
+        filters["workflow_state"] = status
+    else:
+        # Default: show leaves awaiting approval and already approved
+        filters["workflow_state"] = ["in", ["Approved By Department", "Approved", "Rejected"]]
+
+    leaves = frappe.get_all(
+        "Leave",
+        filters=filters,
+        fields=[
+            "name", "employee", "employee_fullname", "dep",
+            "leave_type", "original_leave", "from_date", "to_date", "days",
+            "is_time_leave", "number_of_hours",
+            "reason", "workflow_state", "status",
+            "date_of_application", "alternative_employee",
+            "supervisor", "attachment", "personal_email"
+        ],
+        order_by="modified desc",
+        limit_page_length=200,
+    )
+    return leaves
 

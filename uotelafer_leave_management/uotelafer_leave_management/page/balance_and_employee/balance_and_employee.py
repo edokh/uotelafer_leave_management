@@ -12,7 +12,31 @@ def get_data(filters=None):
     user_filters = {"user_type": "System User"}
     if filters.get("user"):
         user_filters["name"] = filters.get("user")
-        
+
+    # Formation-based access control (skip for System Manager)
+    allowed_departments = None
+    if "System Manager" not in frappe.get_roles(frappe.session.user):
+        current_le = frappe.get_value(
+            "Leave Employee", {"user": frappe.session.user}, ["leave_department"], as_dict=True
+        )
+        if current_le and current_le.leave_department:
+            formation = frappe.get_value(
+                "Leave Department", current_le.leave_department, "formation"
+            )
+            if formation:
+                dept_docs = frappe.get_all(
+                    "Leave Department",
+                    filters={"formation": formation},
+                    fields=["name"]
+                )
+                allowed_departments = [d.name for d in dept_docs]
+            else:
+                # Department exists but has no formation — only show own department
+                allowed_departments = [current_le.leave_department]
+        else:
+            # Current user has no Leave Employee record — show nothing
+            allowed_departments = []
+
     # users
     users = frappe.get_all("User", filters=user_filters, fields=["name", "full_name", "first_name", "middle_name", "last_name", "email"], order_by="name asc")
     
@@ -66,6 +90,12 @@ def get_data(filters=None):
         if filters.get("leave_department") and filters.get("leave_department") != le_dept:
             continue
         if filters.get("leave_employee_type") and filters.get("leave_employee_type") != le_type:
+            continue
+        if filters.get("no_balance") and int(filters.get("no_balance")):
+            if balances.get(u.name):  # has at least one leave type with a transaction
+                continue
+        # Formation access control: only show employees in allowed departments
+        if allowed_departments is not None and le_dept not in allowed_departments:
             continue
 
         row = {

@@ -127,6 +127,67 @@ frappe.pages['balance-and-employee'].on_page_load = function(wrapper) {
 				background-color: var(--card-bg, #fff) !important;
 				box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.15) !important;
 			}
+			.filter-toggle-wrapper {
+				display: flex;
+				flex-direction: column;
+				justify-content: flex-end;
+			}
+			.filter-toggle-label {
+				font-size: 11px;
+				font-weight: 600;
+				text-transform: uppercase;
+				letter-spacing: 0.5px;
+				color: var(--text-muted, #718096);
+				margin-bottom: 4px;
+				white-space: nowrap;
+			}
+			.filter-toggle-pill {
+				display: flex;
+				align-items: center;
+				gap: 7px;
+				cursor: pointer;
+				user-select: none;
+				height: 28px;
+			}
+			.filter-toggle-pill input[type=checkbox] {
+				appearance: none;
+				-webkit-appearance: none;
+				width: 32px;
+				height: 18px;
+				border-radius: 9px;
+				background: var(--border-color, #cbd5e0);
+				transition: background 0.2s;
+				position: relative;
+				flex-shrink: 0;
+				cursor: pointer;
+				margin: 0;
+				border: none !important;
+				box-shadow: none !important;
+				outline: none !important;
+			}
+			.filter-toggle-pill input[type=checkbox]::after {
+				content: '';
+				position: absolute;
+				width: 14px;
+				height: 14px;
+				border-radius: 50%;
+				background: white;
+				top: 2px;
+				left: 2px;
+				transition: left 0.2s;
+				box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+			}
+			.filter-toggle-pill input[type=checkbox]:checked {
+				background: var(--primary, #1b8feb);
+			}
+			.filter-toggle-pill input[type=checkbox]:checked::after {
+				left: 16px;
+			}
+			.filter-toggle-pill span {
+				font-size: 12px;
+				color: var(--text-color, #333);
+				white-space: nowrap;
+			}
 		</style>
 		<div id="custom-filters">
 			<div class="filter-wrapper" id="filter-user"></div>
@@ -134,6 +195,13 @@ frappe.pages['balance-and-employee'].on_page_load = function(wrapper) {
 			<div class="filter-wrapper" id="filter-emp-name"></div>
 			<div class="filter-wrapper" id="filter-profile"></div>
 			<div class="filter-wrapper" id="filter-type"></div>
+			<div class="filter-toggle-wrapper">
+				<div class="filter-toggle-label">${__('Balance Status')}</div>
+				<label class="filter-toggle-pill">
+					<input type="checkbox" id="filter-no-balance">
+					<span>${__('No balance only')}</span>
+				</label>
+			</div>
 		</div>
 		<div id="table-container"></div>
 	`);
@@ -173,6 +241,10 @@ frappe.pages['balance-and-employee'].on_page_load = function(wrapper) {
 		});
 	});
 
+	$(page.main).find('#filter-no-balance').on('change', function() {
+		refresh();
+	});
+
 	let sort_by = null;
 	let sort_asc = false;
 
@@ -182,7 +254,8 @@ frappe.pages['balance-and-employee'].on_page_load = function(wrapper) {
 			leave_department: c2.get_value(),
 			leave_employee_name: c3.get_value(),
 			profile_full_name: c4.get_value(),
-			leave_employee_type: c5.get_value()
+			leave_employee_type: c5.get_value(),
+			no_balance: $(page.main).find('#filter-no-balance').is(':checked') ? 1 : 0
 		};
 
 		page.set_indicator(__('Loading...'), 'orange');

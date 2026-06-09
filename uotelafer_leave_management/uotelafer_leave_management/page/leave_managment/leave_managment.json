@@ -4,7 +4,7 @@
  "docstatus": 0,
  "doctype": "Page",
  "idx": 0,
- "modified": "2026-06-07 13:40:12.472994",
+ "modified": "2026-06-09 09:53:32.127029",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "leave-managment",
@@ -15,16 +15,22 @@
    "role": "University Employee"
   },
   {
-   "role": "University President"
+   "role": "Follow Up Employee"
+  },
+  {
+   "role": "System Manager"
   },
   {
    "role": "Department Head"
   },
   {
-   "role": "Follow Up Employee"
+   "role": "University President"
   },
   {
    "role": "Presidant Office"
+  },
+  {
+   "role": "HR Employee"
   }
  ],
  "script": null,

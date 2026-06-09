@@ -65,8 +65,10 @@ class LeaveManagementPage {
 		this.leave_employees = emp_res.message || [];
 
 		// Determine default tab
-		if (this.user_roles.is_follow_up && !this.user_roles.is_employee && !this.user_roles.is_president && !this.user_roles.is_president_office && !this.user_roles.is_dept_head) {
+		if (this.user_roles.is_follow_up && !this.user_roles.is_employee && !this.user_roles.is_president && !this.user_roles.is_president_office && !this.user_roles.is_dept_head && !this.user_roles.is_single_approver) {
 			this.current_tab = 'follow_up_leaves';
+		} else if (this.user_roles.is_single_approver && !this.user_roles.is_employee && !this.user_roles.is_president && !this.user_roles.is_president_office && !this.user_roles.is_dept_head) {
+			this.current_tab = 'single_approval_leaves';
 		} else if ((this.user_roles.is_president || this.user_roles.is_president_office) && !this.user_roles.is_employee) {
 			this.current_tab = 'president_leaves';
 		} else if (this.user_roles.is_dept_head && !this.user_roles.is_employee) {
@@ -107,6 +109,7 @@ class LeaveManagementPage {
 					${this.user_roles.is_employee ? `<button class="lm-tab ${this.current_tab === 'my_leaves' ? 'active' : ''}" data-tab="my_leaves">إجازاتي</button>` : ''}
 					${this.user_roles.is_proxy_submitter ? `<button class="lm-tab ${this.current_tab === 'proxy_leaves' ? 'active' : ''}" data-tab="proxy_leaves">التقديم بالنيابة</button>` : ''}
 					${this.user_roles.is_dept_head || this.user_roles.is_admin ? `<button class="lm-tab ${this.current_tab === 'department_leaves' ? 'active' : ''}" data-tab="department_leaves">إجازات القسم</button>` : ''}
+					${this.user_roles.is_single_approver ? `<button class="lm-tab ${this.current_tab === 'single_approval_leaves' ? 'active' : ''}" data-tab="single_approval_leaves">الموافقة النهائية</button>` : ''}
 					${this.user_roles.is_president || this.user_roles.is_president_office || this.user_roles.is_admin ? `<button class="lm-tab ${this.current_tab === 'president_leaves' ? 'active' : ''}" data-tab="president_leaves">موافقات الرئاسة</button>` : ''}
 					${this.user_roles.is_follow_up || this.user_roles.is_admin ? `<button class="lm-tab ${this.current_tab === 'follow_up_leaves' ? 'active' : ''}" data-tab="follow_up_leaves">متابعة الإجازات</button>` : ''}
 				</div>
@@ -229,6 +232,16 @@ class LeaveManagementPage {
 				<option value="">الكل (مقبولة ومقدمة)</option>
 			`);
 			status_val = "Approved";
+		} else if (this.current_tab === 'single_approval_leaves') {
+			this.wrapper.find('#printed-filter-wrapper').hide();
+			this.wrapper.find('#btn-bulk-print').hide();
+			this.wrapper.find('#filter-status').html(`
+				<option value="Approved By Department">بانتظار الموافقة</option>
+				<option value="Approved">مقبولة</option>
+				<option value="Rejected">مرفوضة</option>
+				<option value="All">الكل</option>
+			`);
+			status_val = "Approved By Department";
 		} else {
 			this.wrapper.find('#printed-filter-wrapper').hide();
 			this.wrapper.find('#btn-bulk-print').hide();
@@ -467,6 +480,8 @@ class LeaveManagementPage {
 			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_department_leaves';
 		} else if (this.current_tab === 'president_leaves') {
 			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_president_leaves';
+		} else if (this.current_tab === 'single_approval_leaves') {
+			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_single_approval_leaves';
 		} else if (this.current_tab === 'follow_up_leaves') {
 			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_all_leaves';
 		}
@@ -560,7 +575,8 @@ class LeaveManagementPage {
 
 			let can_approve_dept = this.current_tab === 'department_leaves' && row.workflow_state === 'Applied';
 			let can_approve_pres = this.current_tab === 'president_leaves' && row.workflow_state === 'Approved By Department';
-			let needs_action = can_approve_dept || can_approve_pres;
+			let can_approve_single = this.current_tab === 'single_approval_leaves' && row.workflow_state === 'Approved By Department';
+			let needs_action = can_approve_dept || can_approve_pres || can_approve_single;
 			let can_cancel = this.current_tab === 'my_leaves' && row.workflow_state === 'Approved' && row.to_date >= frappe.datetime.nowdate() && row.leave_type !== 'إلغاء إجازة';
 
 			let attachment_btn = row.attachment ? `<button class="lm-action-btn detail" onclick="window.open('${row.attachment}', 'Attachment', 'width=800,height=800'); return false;">عرض</button>` : '-';
@@ -672,6 +688,26 @@ class LeaveManagementPage {
 			}
 		};
 
+		let calculate_hours = () => {
+			if (!dialog) return;
+			let from_time = dialog.get_value('from_time');
+			let to_time = dialog.get_value('to_time');
+			if (from_time && to_time) {
+				let [h1, m1] = from_time.split(':').map(Number);
+				let [h2, m2] = to_time.split(':').map(Number);
+				let d1 = new Date(); d1.setHours(h1, m1, 0, 0);
+				let d2 = new Date(); d2.setHours(h2, m2, 0, 0);
+				let diff = (d2 - d1) / (1000 * 60 * 60);
+				if (diff > 0) {
+					dialog.set_value('number_of_hours', Math.round(diff));
+				} else {
+					dialog.set_value('number_of_hours', 0);
+				}
+			} else {
+				dialog.set_value('number_of_hours', 0);
+			}
+		};
+
 		let fields = [];
 		if (this.user_roles.is_proxy_submitter) {
 			fields.push(
@@ -735,17 +771,30 @@ class LeaveManagementPage {
 			{ fieldtype: 'Link', fieldname: 'dep', label: 'القسم', options: 'Leave Department', reqd: 1, default: this.last_dep },
 			{ fieldtype: 'Data', fieldname: 'personal_email', label: 'البريد الإلكتروني الشخصي', description: 'ايميل الاشعار', default: this.last_personal_email },
 			{ fieldtype: 'Column Break' },
-			{ fieldtype: 'Check', fieldname: 'is_time_leave', label: 'إجازة زمنية (بالساعات)', onchange: () => {
+			{ fieldtype: 'HTML', fieldname: 'time_leave_heading', options: '<div style="margin-bottom: 5px; font-weight: bold; color: var(--text-color); border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">الإجازات الزمنية</div>' },
+			{ fieldtype: 'Check', fieldname: 'is_time_leave', label: '<span style="font-weight:bold; color:var(--text-color); font-size: 1.1em;">إجازة زمنية (بالساعات)</span>', onchange: () => {
 				let val = dialog.get_value('is_time_leave');
 				if (val) {
+					dialog.set_df_property('from_time', 'hidden', 0);
+					dialog.set_df_property('from_time', 'reqd', 1);
+					dialog.set_df_property('to_time', 'hidden', 0);
+					dialog.set_df_property('to_time', 'reqd', 1);
 					dialog.set_df_property('number_of_hours', 'hidden', 0);
 					dialog.set_df_property('number_of_hours', 'reqd', 1);
+					dialog.set_df_property('number_of_hours', 'read_only', 1);
 					dialog.set_df_property('to_date', 'hidden', 1);
 					dialog.set_df_property('to_date', 'reqd', 0);
 					dialog.get_field('days_display').$wrapper.hide();
 				} else {
+					dialog.set_df_property('from_time', 'hidden', 1);
+					dialog.set_df_property('from_time', 'reqd', 0);
+					dialog.set_value('from_time', '');
+					dialog.set_df_property('to_time', 'hidden', 1);
+					dialog.set_df_property('to_time', 'reqd', 0);
+					dialog.set_value('to_time', '');
 					dialog.set_df_property('number_of_hours', 'hidden', 1);
 					dialog.set_df_property('number_of_hours', 'reqd', 0);
+					dialog.set_df_property('number_of_hours', 'read_only', 0);
 					dialog.set_value('number_of_hours', 0);
 					dialog.set_df_property('to_date', 'hidden', 0);
 					dialog.set_df_property('to_date', 'reqd', 1);
@@ -753,6 +802,8 @@ class LeaveManagementPage {
 				}
 				update_days();
 			} },
+			{ fieldtype: 'Time', fieldname: 'from_time', label: 'من الوقت', hidden: 1, onchange: () => calculate_hours() },
+			{ fieldtype: 'Time', fieldname: 'to_time', label: 'إلى الوقت', hidden: 1, onchange: () => calculate_hours() },
 			{ fieldtype: 'Int', fieldname: 'number_of_hours', label: 'عدد الساعات', hidden: 1 },
 			{ fieldtype: 'Date', fieldname: 'from_date', label: 'من تاريخ', reqd: 1, default: frappe.datetime.add_days(frappe.datetime.nowdate(), 1), onchange: () => update_days() },
 			{ fieldtype: 'Date', fieldname: 'to_date', label: 'إلى تاريخ', reqd: 1, default: frappe.datetime.add_days(frappe.datetime.nowdate(), 1), onchange: () => update_days() },
@@ -780,6 +831,8 @@ class LeaveManagementPage {
 						to_date: values.is_time_leave ? values.from_date : values.to_date,
 						is_time_leave: values.is_time_leave ? 1 : 0,
 						number_of_hours: values.number_of_hours || 0,
+						from_time: values.from_time,
+						to_time: values.to_time,
 						reason: values.reason,
 						dep: values.dep,
 						alternative_employee: values.alternative_employee,
@@ -904,7 +957,8 @@ class LeaveManagementPage {
 	async show_details_dialog(row) {
 		let can_approve_dept = this.current_tab === 'department_leaves' && row.workflow_state === 'Applied';
 		let can_approve_pres = this.current_tab === 'president_leaves' && row.workflow_state === 'Approved By Department';
-		let needs_action = can_approve_dept || can_approve_pres;
+		let can_approve_single = this.current_tab === 'single_approval_leaves' && row.workflow_state === 'Approved By Department';
+		let needs_action = can_approve_dept || can_approve_pres || can_approve_single;
 
 		let r = await frappe.call({
 			method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_leave_comments',
