@@ -226,6 +226,11 @@ def apply_workflow_action(leave_name, action, comment=None):
         dept_head_role = settings.department_head_role or "Department Head"
         if dept_head_role not in roles and "System Manager" not in roles:
             frappe.throw(_("Only Department Heads can approve leaves at this stage."))
+            
+        if "System Manager" not in roles and doc.dep:
+            dept_head = frappe.db.get_value("Leave Department", doc.dep, "department_head")
+            if dept_head != user:
+                frappe.throw(_("Access Denied: You are not the Department Head for this employee's department."))
 
     elif doc.workflow_state == "Approved By Department" and action in ["Approve", "Reject"]:
         pres_role = settings.presidant_role or "University President"
@@ -243,6 +248,11 @@ def apply_workflow_action(leave_name, action, comment=None):
 
         if doc.days > max_days and not is_pres and not is_single_approver:
             frappe.throw(_("Only the University President can approve leaves longer than {0} days").format(max_days))
+            
+    else:
+        if not (doc.workflow_state == "Pending" and action == "Apply" and (user == doc.employee or user == doc.owner)):
+            if "System Manager" not in roles:
+                frappe.throw(_("Access Denied or invalid workflow transition via this endpoint."))
 
     frappe.set_user("Administrator")
     try:
@@ -393,6 +403,9 @@ def get_proxy_leaves(from_date=None, to_date=None, leave_type=None, status=None)
 @frappe.whitelist()
 def get_leave_comments(leave_name):
     """Get comments for a leave"""
+    if not frappe.has_permission("Leave", doc=leave_name, ptype="read"):
+        frappe.throw(_("Access Denied"))
+
     comments = frappe.get_all(
         "Comment",
         filters={
@@ -494,6 +507,9 @@ def get_bulk_print_html(leave_names):
     
     html_content = ""
     for name in leave_names:
+        if not frappe.has_permission("Leave", doc=name, ptype="read"):
+            frappe.throw(_("Access Denied to view leave {0}").format(name))
+            
         doc = frappe.get_doc("Leave", name)
         # Render leave using standard print format
         rendered = frappe.get_print(
@@ -511,6 +527,13 @@ def get_bulk_print_html(leave_names):
 @frappe.whitelist()
 def mark_leaves_as_printed(leave_names):
     """Mark a list of leaves as printed"""
+    user = frappe.session.user
+    roles = frappe.get_roles(user)
+    settings = frappe.get_cached_doc("Leave Settings")
+    hr_role = settings.hr_employee_role or "HR Employee"
+    if "System Manager" not in roles and "Follow Up Employee" not in roles and hr_role not in roles:
+        frappe.throw(_("Access Denied"))
+
     import json
     if isinstance(leave_names, str):
         leave_names = json.loads(leave_names)

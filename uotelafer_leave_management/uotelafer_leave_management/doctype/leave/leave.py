@@ -46,15 +46,11 @@ class Leave(Document):
 				frappe.throw(_("Department is required for your first leave application to setup your profile. Please select a Department."))
 			leave_employee = frappe.new_doc("Leave Employee")
 			leave_employee.user = self.employee
-		else:
-			leave_employee = frappe.get_doc("Leave Employee", leave_employee_name)
-			
-		if self.employee_fullname:
-			leave_employee.full_name = self.employee_fullname
-		if self.dep:
-			leave_employee.leave_department = self.dep
-			
-		leave_employee.save(ignore_permissions=True)
+			if self.employee_fullname:
+				leave_employee.full_name = self.employee_fullname
+			if self.dep:
+				leave_employee.leave_department = self.dep
+			leave_employee.save(ignore_permissions=True)
 
 	def before_save(self):
 		if not self.is_new():
@@ -198,6 +194,19 @@ def get_all_leave_balances(employee, current_leave_name=None):
 	"""
 	if not employee:
 		return {}
+
+	user = frappe.session.user
+	roles = frappe.get_roles(user)
+	if employee != user and "System Manager" not in roles and "HR Employee" not in roles and "Follow Up Employee" not in roles:
+		is_head = False
+		if "Department Head" in roles:
+			emp_dep = frappe.db.get_value("Leave Employee", {"user": employee}, "leave_department")
+			if emp_dep:
+				dept_head = frappe.db.get_value("Leave Department", emp_dep, "department_head")
+				if dept_head == user:
+					is_head = True
+		if not is_head:
+			frappe.throw(_("Access Denied: You cannot view balances for this employee."))
 	
 	# Get all leave types
 	leave_types = frappe.get_all("Leave Type", filters={"has_balance": 1}, fields=["name"])
@@ -266,6 +275,19 @@ def get_leave_balance(employee, leave_type, current_leave_name=None):
 	"""
 	if not employee or not leave_type:
 		return {'total_balance': 0, 'applications': []}
+
+	user = frappe.session.user
+	roles = frappe.get_roles(user)
+	if employee != user and "System Manager" not in roles and "HR Employee" not in roles and "Follow Up Employee" not in roles:
+		is_head = False
+		if "Department Head" in roles:
+			emp_dep = frappe.db.get_value("Leave Employee", {"user": employee}, "leave_department")
+			if emp_dep:
+				dept_head = frappe.db.get_value("Leave Department", emp_dep, "department_head")
+				if dept_head == user:
+					is_head = True
+		if not is_head:
+			frappe.throw(_("Access Denied: You cannot view balances for this employee."))
 	
 	# Get all leave balance transactions for this employee and leave type
 	transactions = frappe.get_all(

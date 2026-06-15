@@ -4,6 +4,10 @@ import json
 
 @frappe.whitelist()
 def get_data(filters=None):
+    roles = frappe.get_roles(frappe.session.user)
+    if "System Manager" not in roles and "HR Employee" not in roles and "Follow Up Employee" not in roles:
+        frappe.throw("Access Denied")
+
     if isinstance(filters, str):
         filters = json.loads(filters)
     else:
@@ -119,6 +123,10 @@ def get_data(filters=None):
  
 @frappe.whitelist()
 def save_user_row(user, leave_employee_name, leave_department, balances, first_name=None, middle_name=None, last_name=None, leave_employee_type=None):
+    roles = frappe.get_roles(frappe.session.user)
+    if "System Manager" not in roles and "HR Employee" not in roles:
+        frappe.throw("Access Denied")
+
     if isinstance(balances, str):
         balances = json.loads(balances)
         

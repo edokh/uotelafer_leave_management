@@ -10,7 +10,14 @@
  "name": "balance-and-employee",
  "owner": "Administrator",
  "page_name": "balance-and-employee",
- "roles": [],
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "HR Employee"
+  }
+ ],
  "script": null,
  "standard": "Yes",
  "style": null,
