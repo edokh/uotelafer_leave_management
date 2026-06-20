@@ -52,6 +52,13 @@ class Leave(Document):
 				leave_employee.leave_department = self.dep
 			leave_employee.save(ignore_permissions=True)
 
+		if self.workflow_state == "Rejected" or self.status == "Rejected":
+			frappe.db.delete("Leave Balance Transaction", {"note": ["like", f"%{self.name}%"]})
+
+	def on_update_after_submit(self):
+		if self.workflow_state == "Rejected" or self.status == "Rejected":
+			frappe.db.delete("Leave Balance Transaction", {"note": ["like", f"%{self.name}%"]})
+
 	def before_save(self):
 		if not self.is_new():
 			old_doc = self.get_doc_before_save()
@@ -137,10 +144,13 @@ class Leave(Document):
 	
 	def before_submit(self):
 		"""Validate that status is not Rejected before submission"""
-		if self.status == "Rejected":
+		if self.status == "Rejected" or self.workflow_state == "Rejected":
 			frappe.throw(_("Cannot submit a Rejected leave request"))
 
 	def on_submit(self):
+		if self.status == "Rejected" or self.workflow_state == "Rejected":
+			return
+
 		"""Create a Leave Balance Transaction after submission"""
 		if not self.days and not self.is_time_leave:
 			return
@@ -246,15 +256,16 @@ def get_all_leave_balances(employee, current_leave_name=None):
 		leave_applications = frappe.get_all(
 			"Leave",
 			filters=filters,
-			fields=["days", "status", "name", "is_time_leave", "number_of_hours"]
+			fields=["days", "status", "workflow_state", "name", "is_time_leave", "number_of_hours"]
 		)
 		
 		# Sum all days from leaves and subtract from balance
 		taken_days = 0
 		for application in leave_applications:
 			status = application.get("status")
+			workflow_state = application.get("workflow_state")
 			# Count leaves that are not Rejected
-			if status != "Rejected":
+			if status != "Rejected" and workflow_state != "Rejected":
 				if application.get("is_time_leave"):
 					taken_days += (application.get("number_of_hours", 0) / 7.0)
 				else:
@@ -320,15 +331,16 @@ def get_leave_balance(employee, leave_type, current_leave_name=None):
 	leave_applications = frappe.get_all(
 		"Leave",
 		filters=filters,
-		fields=["days", "status", "is_time_leave", "number_of_hours"]
+		fields=["days", "status", "workflow_state", "is_time_leave", "number_of_hours"]
 	)
 	
 	# Sum all days from leaves and subtract from balance
 	taken_days = 0
 	for application in leave_applications:
 		status = application.get("status")
+		workflow_state = application.get("workflow_state")
 		# Count leaves that are not Rejected
-		if status != "Rejected":
+		if status != "Rejected" and workflow_state != "Rejected":
 			if application.get("is_time_leave"):
 				taken_days += (application.get("number_of_hours", 0) / 7.0)
 			else:
