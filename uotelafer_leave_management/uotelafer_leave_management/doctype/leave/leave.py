@@ -67,6 +67,13 @@ class Leave(Document):
 					self.date_of_supervisor_action = frappe.utils.today()
 				elif self.workflow_state == "Approved" or (old_doc.workflow_state == "Approved By Department" and self.workflow_state == "Rejected"):
 					self.date_of_presidant_action = frappe.utils.today()
+					if self.workflow_state == "Approved":
+						if not self.approved_by or self.approved_by == "Administrator":
+							u = frappe.session.user
+							self.approved_by = u
+							self.approved_by_name = frappe.db.get_value("User", u, "full_name") or u
+							self.approved_by_email = frappe.db.get_value("User", u, "email") or u
+							self.approved_on = frappe.utils.now_datetime()
 
 	def validate(self):
 		"""Validate and calculate leave days, excluding holidays and weekends"""

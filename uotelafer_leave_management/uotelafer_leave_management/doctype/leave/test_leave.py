@@ -8,15 +8,26 @@ from uotelafer_leave_management.uotelafer_leave_management.doctype.leave.leave i
 
 class TestLeave(FrappeTestCase):
 	def setUp(self):
+		# Create a test formation if it doesn't exist
+		if not frappe.db.exists("Leave Formation", "Test Formation"):
+			frappe.get_doc({
+				"doctype": "Leave Formation",
+				"formation_name": "Test Formation"
+			}).insert(ignore_permissions=True)
+
 		# Create a test department if it doesn't exist
 		if not frappe.db.exists("Leave Department", "Test Dept"):
 			self.dept = frappe.get_doc({
 				"doctype": "Leave Department",
 				"department_name": "Test Dept",
+				"formation": "Test Formation",
 				"department_head": "Administrator"
 			}).insert(ignore_permissions=True)
 		else:
 			self.dept = frappe.get_doc("Leave Department", "Test Dept")
+			if not self.dept.formation:
+				self.dept.formation = "Test Formation"
+				self.dept.save(ignore_permissions=True)
 
 		# Ensure "إلغاء إجازة" leave type exists
 		if not frappe.db.exists("Leave Type", "إلغاء إجازة"):
@@ -316,3 +327,37 @@ class TestLeave(FrappeTestCase):
 			"reason": "Leave in cancelled period"
 		})
 		self.insert_doc_without_workflow(leave2_valid) # Should succeed
+
+	def test_approval_recording(self):
+		"""Test that approval registers who and when approved the leave"""
+		leave = frappe.get_doc({
+			"doctype": "Leave",
+			"employee": "Administrator",
+			"leave_type": "اجازة اعتيادية",
+			"from_date": "2026-07-01",
+			"to_date": "2026-07-05",
+			"dep": "Test Dept",
+			"reason": "Testing approval logging"
+		})
+		self.insert_doc_without_workflow(leave)
+		leave.workflow_state = "Pending"
+		leave.save()
+
+		# Approve using apply_workflow_action (custom API page action)
+		from uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment import apply_workflow_action
+		
+		# Set session user to Administrator
+		frappe.set_user("Administrator")
+		
+		# Run workflow action
+		apply_workflow_action(leave.name, "Apply")
+		apply_workflow_action(leave.name, "Approve") # Applied -> Approved By Department
+		apply_workflow_action(leave.name, "Approve") # Approved By Department -> Approved
+
+		# Reload document and verify
+		leave.reload()
+		self.assertEqual(leave.workflow_state, "Approved")
+		self.assertEqual(leave.approved_by, "Administrator")
+		self.assertEqual(leave.approved_by_name, frappe.db.get_value("User", "Administrator", "full_name"))
+		self.assertEqual(leave.approved_by_email, frappe.db.get_value("User", "Administrator", "email"))
+		self.assertIsNotNone(leave.approved_on)

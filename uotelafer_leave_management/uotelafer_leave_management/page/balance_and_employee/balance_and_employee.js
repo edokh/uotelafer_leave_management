@@ -188,7 +188,98 @@ frappe.pages['balance-and-employee'].on_page_load = function(wrapper) {
 				color: var(--text-color, #333);
 				white-space: nowrap;
 			}
+
+			/* Tabs Design */
+			.tab-btn {
+				background: none;
+				border: none;
+				border-bottom: 3px solid transparent;
+				padding: 10px 20px !important;
+				font-size: 14px !important;
+				font-weight: 600 !important;
+				color: var(--text-muted, #64748b) !important;
+				cursor: pointer;
+				transition: all 0.2s ease;
+				margin-bottom: -2px;
+				outline: none !important;
+			}
+			.tab-btn:hover {
+				color: var(--text-color, #1e293b) !important;
+			}
+			.tab-btn.active {
+				color: var(--primary, #1b8feb) !important;
+				border-bottom-color: var(--primary, #1b8feb) !important;
+			}
+			.tab-container {
+				display: flex;
+				gap: 10px;
+				margin: 15px 15px 0 15px;
+				border-bottom: 2px solid var(--border-color, #e2e8f0);
+			}
+
+			/* Log Table Design */
+			.log-table {
+				width: 100%;
+				border-collapse: separate;
+				border-spacing: 0;
+				margin-top: 10px;
+				border: 1px solid var(--border-color, #cbd5e0);
+				border-radius: 8px;
+				overflow: hidden;
+				background-color: var(--card-bg, #fff);
+				direction: rtl;
+			}
+			.log-table th {
+				background-color: var(--modal-bg, #f7fafc) !important;
+				color: var(--text-color, #1e293b) !important;
+				font-weight: 600 !important;
+				text-align: right !important;
+				padding: 12px 16px !important;
+				font-size: 13px !important;
+				border-bottom: 2px solid var(--border-color, #e2e8f0);
+				height: auto !important;
+			}
+			.log-table td {
+				padding: 12px 16px !important;
+				font-size: 13px !important;
+				border-bottom: 1px solid var(--border-color, #cbd5e0);
+				color: var(--text-color, #334155);
+				height: auto !important;
+				vertical-align: middle;
+				text-align: right !important;
+			}
+			.log-table tr:last-child td {
+				border-bottom: none;
+			}
+			.log-table tr:hover td {
+				background-color: var(--control-bg, #f8fafc);
+			}
+			.log-badge-user {
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				padding: 4px 8px;
+				background-color: #f1f5f9;
+				color: #475569;
+				border-radius: 6px;
+				font-weight: 500;
+				font-size: 12px;
+			}
+			.log-badge-email {
+				font-size: 11px;
+				color: #64748b;
+				display: block;
+				margin-top: 2px;
+			}
+			.log-badge-date {
+				font-size: 12px;
+				color: #64748b;
+			}
 		</style>
+		<div class="tab-container">
+			<button class="tab-btn active" id="btn-tab-balances">${__('أرصدة الموظفين')}</button>
+			<button class="tab-btn" id="btn-tab-accepted-leaves">${__('سجل الإجازات المقبولة')}</button>
+		</div>
 		<div id="custom-filters">
 			<div class="filter-wrapper" id="filter-user"></div>
 			<div class="filter-wrapper" id="filter-dept"></div>
@@ -204,6 +295,7 @@ frappe.pages['balance-and-employee'].on_page_load = function(wrapper) {
 			</div>
 		</div>
 		<div id="table-container"></div>
+		<div id="accepted-leaves-container" style="display: none; margin: 15px;"></div>
 	`);
 
 	let filters = {};
@@ -234,6 +326,38 @@ frappe.pages['balance-and-employee'].on_page_load = function(wrapper) {
 		render_input: true
 	});
 
+	let active_tab = 'balances';
+
+	$(page.main).find('#btn-tab-balances').on('click', function() {
+		$(this).addClass('active');
+		$(page.main).find('#btn-tab-accepted-leaves').removeClass('active');
+		active_tab = 'balances';
+		$(page.main).find('#table-container').show();
+		$(page.main).find('#accepted-leaves-container').hide();
+		
+		// Show balances-only filters
+		$(page.main).find('#filter-profile').show();
+		$(page.main).find('#filter-type').show();
+		$(page.main).find('.filter-toggle-wrapper').show();
+		
+		refresh();
+	});
+
+	$(page.main).find('#btn-tab-accepted-leaves').on('click', function() {
+		$(this).addClass('active');
+		$(page.main).find('#btn-tab-balances').removeClass('active');
+		active_tab = 'accepted_leaves';
+		$(page.main).find('#table-container').hide();
+		$(page.main).find('#accepted-leaves-container').show();
+		
+		// Hide balances-only filters
+		$(page.main).find('#filter-profile').hide();
+		$(page.main).find('#filter-type').hide();
+		$(page.main).find('.filter-toggle-wrapper').hide();
+		
+		refresh();
+	});
+
 	let controls = [c1, c2, c3, c4, c5];
 	controls.forEach(c => {
 		c.$input.on('change', function() {
@@ -259,16 +383,29 @@ frappe.pages['balance-and-employee'].on_page_load = function(wrapper) {
 		};
 
 		page.set_indicator(__('Loading...'), 'orange');
-		frappe.call({
-			method: 'uotelafer_leave_management.uotelafer_leave_management.page.balance_and_employee.balance_and_employee.get_data',
-			args: { filters: filters },
-			callback: function(r) {
-				if(r.message) {
-					render_table(r.message);
-					page.set_indicator(__('Ready'), 'green');
+		if (active_tab === 'balances') {
+			frappe.call({
+				method: 'uotelafer_leave_management.uotelafer_leave_management.page.balance_and_employee.balance_and_employee.get_data',
+				args: { filters: filters },
+				callback: function(r) {
+					if(r.message) {
+						render_table(r.message);
+						page.set_indicator(__('Ready'), 'green');
+					}
 				}
-			}
-		});
+			});
+		} else {
+			frappe.call({
+				method: 'uotelafer_leave_management.uotelafer_leave_management.page.balance_and_employee.balance_and_employee.get_accepted_leaves',
+				args: { filters: filters },
+				callback: function(r) {
+					if(r.message) {
+						render_accepted_leaves(r.message);
+						page.set_indicator(__('Ready'), 'green');
+					}
+				}
+			});
+		}
 	}
 
 	refresh();
@@ -435,5 +572,80 @@ frappe.pages['balance-and-employee'].on_page_load = function(wrapper) {
 				}
 			});
 		});
+	}
+
+	function render_accepted_leaves(data) {
+		let container = $(page.main).find('#accepted-leaves-container');
+		container.empty();
+
+		if (data.length === 0) {
+			container.html(`
+				<div style="text-align: center; padding: 30px; color: var(--text-muted, #718096); font-size: 14px; background-color: var(--card-bg, #fff); border: 1px solid var(--border-color, #cbd5e0); border-radius: 8px;">
+					📁 ${__('لا توجد إجازات مقبولة')}
+				</div>
+			`);
+			return;
+		}
+
+		let table_html = `
+			<div class="table-responsive">
+				<table class="log-table">
+					<thead>
+						<tr>
+							<th style="width: 120px; text-align: right;">${__('رقم الإجازة')}</th>
+							<th style="text-align: right;">${__('اسم الموظف')}</th>
+							<th style="text-align: right;">${__('نوع الإجازة')}</th>
+							<th style="width: 120px; text-align: right;">${__('من تاريخ')}</th>
+							<th style="width: 120px; text-align: right;">${__('إلى تاريخ')}</th>
+							<th style="width: 100px; text-align: right;">${__('المدة')}</th>
+							<th style="text-align: right;">${__('تم القبول بواسطة')}</th>
+							<th style="width: 180px; text-align: right;">${__('تاريخ القبول')}</th>
+						</tr>
+					</thead>
+					<tbody>
+		`;
+
+		data.forEach(row => {
+			let duration_str = row.is_time_leave ? `${row.number_of_hours} ${__('ساعات')}` : `${row.days} ${__('أيام')}`;
+			let doc_link = `/app/leave/${row.name}`;
+			
+			let approver_str = '-';
+			if (row.approved_by) {
+				let name_display = row.approved_by_name || row.approved_by;
+				let email_display = row.approved_by_email ? `<span class="log-badge-email">${row.approved_by_email}</span>` : '';
+				approver_str = `
+					<div>
+						<span class="log-badge-user">${name_display}</span>
+						${email_display}
+					</div>
+				`;
+			}
+
+			let approved_on_str = row.approved_on ? frappe.datetime.str_to_user(row.approved_on) : '-';
+
+			table_html += `
+				<tr>
+					<td><a href="${doc_link}" target="_blank" style="font-weight: bold; color: var(--primary, #1b8feb);">${row.name}</a></td>
+					<td><b>${row.employee_fullname || row.employee}</b></td>
+					<td>
+						${row.leave_type}
+						${row.is_time_leave ? `<br><span style="font-size: 11px; padding: 2px 6px; background: #e0e7ff; color: #3730a3; border-radius: 4px;">${__('إجازة زمنية')}</span>` : ''}
+					</td>
+					<td>${row.from_date}</td>
+					<td>${row.to_date}</td>
+					<td><b>${duration_str}</b></td>
+					<td>${approver_str}</td>
+					<td><span class="log-badge-date">${approved_on_str}</span></td>
+				</tr>
+			`;
+		});
+
+		table_html += `
+					</tbody>
+				</table>
+			</div>
+		`;
+
+		container.html(table_html);
 	}
 }

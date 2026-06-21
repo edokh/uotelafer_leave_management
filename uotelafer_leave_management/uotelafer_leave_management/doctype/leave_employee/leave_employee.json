@@ -35,8 +35,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Leave Department",
-   "options": "Leave Department",
-   "reqd": 1
+   "options": "Leave Department"
   },
   {
    "fieldname": "type",
@@ -47,7 +46,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-09 09:19:31.254836",
+ "modified": "2026-06-21 09:55:59.710576",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave Employee",

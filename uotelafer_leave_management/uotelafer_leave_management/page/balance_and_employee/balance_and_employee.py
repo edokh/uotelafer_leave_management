@@ -224,3 +224,70 @@ def save_user_row(user, leave_employee_name, leave_department, balances, first_n
 
     frappe.db.commit()
     return "success"
+
+
+@frappe.whitelist()
+def get_accepted_leaves(filters=None):
+    roles = frappe.get_roles(frappe.session.user)
+    if "System Manager" not in roles and "HR Employee" not in roles and "Follow Up Employee" not in roles:
+        frappe.throw("Access Denied")
+
+    if isinstance(filters, str):
+        filters = json.loads(filters)
+    else:
+        filters = filters or {}
+
+    db_filters = {"workflow_state": "Approved"}
+
+    if filters.get("user"):
+        db_filters["employee"] = filters.get("user")
+    
+    if filters.get("leave_department"):
+        db_filters["dep"] = filters.get("leave_department")
+
+    # Formation-based access control (skip for System Manager)
+    if "System Manager" not in frappe.get_roles(frappe.session.user):
+        current_le = frappe.get_value(
+            "Leave Employee", {"user": frappe.session.user}, ["leave_department"], as_dict=True
+        )
+        if current_le and current_le.leave_department:
+            formation = frappe.get_value(
+                "Leave Department", current_le.leave_department, "formation"
+            )
+            if formation:
+                dept_docs = frappe.get_all(
+                    "Leave Department",
+                    filters={"formation": formation},
+                    fields=["name"]
+                )
+                allowed_departments = [d.name for d in dept_docs]
+                if filters.get("leave_department"):
+                    if filters.get("leave_department") not in allowed_departments:
+                        return []
+                else:
+                    db_filters["dep"] = ["in", allowed_departments]
+            else:
+                if filters.get("leave_department"):
+                    if filters.get("leave_department") != current_le.leave_department:
+                        return []
+                else:
+                    db_filters["dep"] = current_le.leave_department
+        else:
+            return []
+
+    leaves = frappe.get_all(
+        "Leave",
+        filters=db_filters,
+        fields=[
+            "name", "employee", "employee_fullname", "dep", "leave_type",
+            "from_date", "to_date", "days", "is_time_leave", "number_of_hours",
+            "approved_by", "approved_by_name", "approved_by_email", "approved_on"
+        ],
+        order_by="approved_on desc"
+    )
+
+    if filters.get("leave_employee_name"):
+        search_name = filters.get("leave_employee_name").lower()
+        leaves = [l for l in leaves if search_name in (l.employee_fullname or "").lower()]
+
+    return leaves

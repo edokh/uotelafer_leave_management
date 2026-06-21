@@ -257,6 +257,11 @@ def apply_workflow_action(leave_name, action, comment=None):
     frappe.set_user("Administrator")
     try:
         frappe.model.workflow.apply_workflow(doc, action)
+        if doc.workflow_state == "Approved":
+            doc.approved_by = user
+            doc.approved_by_name = frappe.db.get_value("User", user, "full_name") or user
+            doc.approved_by_email = frappe.db.get_value("User", user, "email") or user
+            doc.approved_on = frappe.utils.now_datetime()
         doc.save(ignore_permissions=True)
     finally:
         frappe.set_user(user)
