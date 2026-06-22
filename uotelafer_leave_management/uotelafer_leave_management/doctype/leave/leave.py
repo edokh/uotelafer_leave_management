@@ -214,7 +214,12 @@ def get_all_leave_balances(employee, current_leave_name=None):
 
 	user = frappe.session.user
 	roles = frappe.get_roles(user)
-	if employee != user and "System Manager" not in roles and "HR Employee" not in roles and "Follow Up Employee" not in roles:
+	
+	settings = frappe.get_cached_doc("Leave Settings")
+	pres_role = settings.presidant_role or "University President"
+	pres_office_role = settings.presidant_office_role or "Presidant Office"
+	
+	if employee != user and "System Manager" not in roles and "HR Employee" not in roles and "Follow Up Employee" not in roles and pres_role not in roles and pres_office_role not in roles:
 		is_head = False
 		if "Department Head" in roles:
 			emp_dep = frappe.db.get_value("Leave Employee", {"user": employee}, "leave_department")
@@ -317,7 +322,12 @@ def get_leave_balance(employee, leave_type, current_leave_name=None):
 
 	user = frappe.session.user
 	roles = frappe.get_roles(user)
-	if employee != user and "System Manager" not in roles and "HR Employee" not in roles and "Follow Up Employee" not in roles:
+	
+	settings = frappe.get_cached_doc("Leave Settings")
+	pres_role = settings.presidant_role or "University President"
+	pres_office_role = settings.presidant_office_role or "Presidant Office"
+	
+	if employee != user and "System Manager" not in roles and "HR Employee" not in roles and "Follow Up Employee" not in roles and pres_role not in roles and pres_office_role not in roles:
 		is_head = False
 		if "Department Head" in roles:
 			emp_dep = frappe.db.get_value("Leave Employee", {"user": employee}, "leave_department")
