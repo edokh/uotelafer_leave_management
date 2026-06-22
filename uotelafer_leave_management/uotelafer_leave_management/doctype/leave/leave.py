@@ -230,6 +230,19 @@ def get_all_leave_balances(employee, current_leave_name=None):
 					formation_doc = frappe.get_cached_doc("Leave Formation", formation)
 					if formation_doc.single_approval and formation_doc.approver_role in roles:
 						is_head = True
+		if not is_head and current_leave_name:
+			leave_dep = frappe.db.get_value("Leave", current_leave_name, "dep")
+			if leave_dep:
+				dept_head = frappe.db.get_value("Leave Department", leave_dep, "department_head")
+				if dept_head == user:
+					is_head = True
+				if not is_head:
+					formation = frappe.db.get_value("Leave Department", leave_dep, "formation")
+					if formation:
+						formation_doc = frappe.get_cached_doc("Leave Formation", formation)
+						if formation_doc.single_approval and formation_doc.approver_role in roles:
+							is_head = True
+
 		if not is_head:
 			frappe.throw(_("Access Denied: You cannot view balances for this employee."))
 	
@@ -320,6 +333,19 @@ def get_leave_balance(employee, leave_type, current_leave_name=None):
 					formation_doc = frappe.get_cached_doc("Leave Formation", formation)
 					if formation_doc.single_approval and formation_doc.approver_role in roles:
 						is_head = True
+		if not is_head and current_leave_name:
+			leave_dep = frappe.db.get_value("Leave", current_leave_name, "dep")
+			if leave_dep:
+				dept_head = frappe.db.get_value("Leave Department", leave_dep, "department_head")
+				if dept_head == user:
+					is_head = True
+				if not is_head:
+					formation = frappe.db.get_value("Leave Department", leave_dep, "formation")
+					if formation:
+						formation_doc = frappe.get_cached_doc("Leave Formation", formation)
+						if formation_doc.single_approval and formation_doc.approver_role in roles:
+							is_head = True
+
 		if not is_head:
 			frappe.throw(_("Access Denied: You cannot view balances for this employee."))
 	
