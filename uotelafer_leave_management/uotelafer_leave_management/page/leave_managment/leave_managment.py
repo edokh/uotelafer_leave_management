@@ -629,3 +629,22 @@ def get_single_approval_leaves(from_date=None, to_date=None, leave_type=None, st
     )
     return leaves
 
+@frappe.whitelist()
+def remove_wrong_department_leave(leave_name):
+    """Remove a leave if the employee does not belong to the department (department head action)"""
+    user = frappe.session.user
+    roles = frappe.get_roles(user)
+    
+    doc = frappe.get_doc("Leave", leave_name)
+    
+    # Verify user is the department head of doc.dep
+    if "System Manager" not in roles:
+        dept_head = frappe.db.get_value("Leave Department", doc.dep, "department_head")
+        if dept_head != user:
+            frappe.throw(_("Access Denied: You are not the Department Head for this department."))
+            
+    # Remove the leave completely
+    frappe.delete_doc("Leave", leave_name, force=1)
+    
+    return {"status": "success"}
+

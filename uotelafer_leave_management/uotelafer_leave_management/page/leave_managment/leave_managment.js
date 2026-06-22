@@ -1099,6 +1099,25 @@ class LeaveManagementPage {
 		if (needs_action) {
 			dialog.get_primary_btn().removeClass('btn-primary').addClass('btn-success');
 			dialog.get_secondary_btn().removeClass('btn-default').addClass('btn-danger');
+
+			if (this.current_tab === 'department_leaves') {
+				dialog.add_custom_action('إلغاء لعدم الانتماء للقسم', () => {
+					frappe.confirm('هل أنت متأكد من إلغاء وحذف هذا الطلب لعدم انتماء الموظف للقسم؟', () => {
+						frappe.call({
+							method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.remove_wrong_department_leave',
+							args: { leave_name: row.name },
+							freeze: true,
+							callback: (r) => {
+								if (!r.exc) {
+									frappe.show_alert({ message: 'تم إلغاء وحذف الإجازة بنجاح', indicator: 'green' });
+									dialog.hide();
+									this.load_data();
+								}
+							}
+						});
+					});
+				}).addClass('btn-warning').css({'color': 'white', 'background-color': '#f59e0b', 'border': 'none'});
+			}
 		}
 
 		dialog.show();

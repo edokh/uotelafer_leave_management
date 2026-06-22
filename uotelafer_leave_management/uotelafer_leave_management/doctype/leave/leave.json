@@ -20,6 +20,7 @@
   "number_of_hours",
   "from_time",
   "to_time",
+  "number",
   "column_break_fhww",
   "supervisor",
   "supervisor_personal_email",
@@ -272,12 +273,17 @@
    "fieldtype": "Datetime",
    "label": "Approved On",
    "read_only": 1
+  },
+  {
+   "fieldname": "number",
+   "fieldtype": "Data",
+   "label": "Number"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-09 10:30:52.862019",
+ "modified": "2026-06-21 13:59:41.342315",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave",

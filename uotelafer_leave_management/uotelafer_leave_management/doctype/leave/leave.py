@@ -223,6 +223,14 @@ def get_all_leave_balances(employee, current_leave_name=None):
 				if dept_head == user:
 					is_head = True
 		if not is_head:
+			emp_dep = frappe.db.get_value("Leave Employee", {"user": employee}, "leave_department")
+			if emp_dep:
+				formation = frappe.db.get_value("Leave Department", emp_dep, "formation")
+				if formation:
+					formation_doc = frappe.get_cached_doc("Leave Formation", formation)
+					if formation_doc.single_approval and formation_doc.approver_role in roles:
+						is_head = True
+		if not is_head:
 			frappe.throw(_("Access Denied: You cannot view balances for this employee."))
 	
 	# Get all leave types
@@ -304,6 +312,14 @@ def get_leave_balance(employee, leave_type, current_leave_name=None):
 				dept_head = frappe.db.get_value("Leave Department", emp_dep, "department_head")
 				if dept_head == user:
 					is_head = True
+		if not is_head:
+			emp_dep = frappe.db.get_value("Leave Employee", {"user": employee}, "leave_department")
+			if emp_dep:
+				formation = frappe.db.get_value("Leave Department", emp_dep, "formation")
+				if formation:
+					formation_doc = frappe.get_cached_doc("Leave Formation", formation)
+					if formation_doc.single_approval and formation_doc.approver_role in roles:
+						is_head = True
 		if not is_head:
 			frappe.throw(_("Access Denied: You cannot view balances for this employee."))
 	
