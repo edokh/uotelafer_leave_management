@@ -1116,7 +1116,15 @@ class LeaveManagementPage {
 							}
 						});
 					});
-				}).addClass('btn-warning').css({'color': 'white', 'background-color': '#f59e0b', 'border': 'none'});
+				});
+				// Style the custom action button
+				setTimeout(() => {
+					dialog.$wrapper.find('.btn-custom').each(function() {
+						if ($(this).text().includes('إلغاء لعدم الانتماء للقسم')) {
+							$(this).removeClass('btn-default').addClass('btn-warning').css({'color': 'white', 'background-color': '#f59e0b', 'border': 'none'});
+						}
+					});
+				}, 10);
 			}
 		}
 
