@@ -578,6 +578,7 @@ class LeaveManagementPage {
 			let can_approve_single = this.current_tab === 'single_approval_leaves' && row.workflow_state === 'Approved By Department';
 			let needs_action = can_approve_dept || can_approve_pres || can_approve_single;
 			let can_cancel = this.current_tab === 'my_leaves' && row.workflow_state === 'Approved' && row.to_date >= frappe.datetime.nowdate() && row.leave_type !== 'إلغاء إجازة';
+			let can_withdraw = (this.current_tab === 'my_leaves' || this.current_tab === 'proxy_leaves') && (row.workflow_state === 'Pending' || row.workflow_state === 'Applied');
 
 			let attachment_btn = row.attachment ? `<button class="lm-action-btn detail" onclick="window.open('${row.attachment}', 'Attachment', 'width=800,height=800'); return false;">عرض</button>` : '-';
 
@@ -610,6 +611,7 @@ class LeaveManagementPage {
 							<button class="lm-action-btn print-pdf" data-name="${row.name}" style="background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; margin-left: 5px;">طباعة</button>
 							<button class="lm-action-btn detail" data-name="${row.name}">${needs_action ? 'إجراء' : 'تفاصيل'}</button>
 							${can_cancel ? `<button class="lm-action-btn stop-leave btn-warning" data-name="${row.name}" style="margin-right: 5px; background-color: #f59e0b; color: white; border: none;">قطع</button>` : ''}
+							${can_withdraw ? `<button class="lm-action-btn withdraw-leave btn-danger" data-name="${row.name}" style="margin-right: 5px; background-color: #ef4444; color: white; border: none;">سحب</button>` : ''}
 						</div>
 					</td>
 				</tr>
@@ -623,6 +625,25 @@ class LeaveManagementPage {
 				tr.find('.stop-leave').on('click', (e) => {
 					e.stopPropagation();
 					this.show_cancellation_dialog(row);
+				});
+			}
+
+			if (can_withdraw) {
+				tr.find('.withdraw-leave').on('click', (e) => {
+					e.stopPropagation();
+					frappe.confirm('هل أنت متأكد من سحب هذا الطلب؟ سيتم استرجاع الرصيد المخصوم تلقائياً.', () => {
+						frappe.call({
+							method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.withdraw_leave',
+							args: { leave_name: row.name },
+							freeze: true,
+							callback: (r) => {
+								if (!r.exc) {
+									frappe.show_alert({ message: 'تم سحب الإجازة بنجاح واسترجاع الرصيد', indicator: 'green' });
+									this.load_data();
+								}
+							}
+						});
+					});
 				});
 			}
 

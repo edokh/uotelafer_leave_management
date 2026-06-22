@@ -648,3 +648,40 @@ def remove_wrong_department_leave(leave_name):
     
     return {"status": "success"}
 
+@frappe.whitelist()
+def withdraw_leave(leave_name):
+    """Allows an employee to withdraw/cancel their own leave before department approval"""
+    user = frappe.session.user
+    
+    doc = frappe.get_doc("Leave", leave_name)
+    
+    # Verify ownership
+    if doc.employee != user and doc.owner != user:
+        roles = frappe.get_roles(user)
+        if "System Manager" not in roles and "Leave Proxy Submitter" not in roles:
+            frappe.throw(_("Access Denied: You can only withdraw your own leaves."))
+            
+    # Check state
+    if doc.workflow_state not in ["Pending", "Applied"]:
+        frappe.throw(_("You can only withdraw leaves that have not yet been approved by the department."))
+        
+    frappe.set_user("Administrator")
+    try:
+        if doc.docstatus == 1:
+            # Need to cancel it if it's already submitted
+            doc.cancel()
+            
+        frappe.db.set_value("Leave", leave_name, "workflow_state", "Rejected")
+        frappe.db.set_value("Leave", leave_name, "status", "Rejected")
+        
+        # Add comment
+        doc.add_comment("Comment", "تم سحب الإجازة من قبل الموظف")
+        
+        # Explicitly delete any balance transactions (consumption) for this leave just in case
+        frappe.db.delete("Leave Balance Transaction", {"note": ["like", f"%{leave_name}%"]})
+        
+    finally:
+        frappe.set_user(user)
+        
+    return {"status": "success"}
+
