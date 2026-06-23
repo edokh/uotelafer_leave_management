@@ -662,3 +662,27 @@
 .lm-action-btn.stop-leave:hover {
     box-shadow: 0 4px 14px rgba(245,158,11,.45);
 }
+
+/* ===== Read / Unread Status ===== */
+.lm-row-read {
+    background-color: #f8fafc;
+}
+.lm-row-unread {
+    background-color: #fef2f2;
+}
+.lm-table tbody tr.lm-row-read:hover {
+    background-color: #f1f5f9;
+}
+.lm-table tbody tr.lm-row-unread:hover {
+    background-color: #fee2e2;
+}
+.lm-action-btn.btn-read {
+    background: #e2e8f0;
+    color: #475569;
+    border: 1px solid #cbd5e1;
+}
+.lm-action-btn.btn-unread {
+    background: #3b82f6;
+    color: #ffffff;
+    border: none;
+}

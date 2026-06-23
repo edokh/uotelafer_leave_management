@@ -167,7 +167,6 @@ class LeaveManagementPage {
 							<option value="Printed">مطبوعة</option>
 						</select>
 					</div>
-					<button class="lm-filter-btn" id="btn-filter">تحديث</button>
 					<button class="lm-filter-clear" id="btn-clear-filter">مسح</button>
 					</div>
 				</div>
@@ -185,7 +184,6 @@ class LeaveManagementPage {
 								<th>من تاريخ</th>
 								<th>الأيام</th>
 								<th>السبب</th>
-								<th>المرفقات</th>
 								<th>الحالة</th>
 								<th>القسم</th>
 								<th>الإجراءات</th>
@@ -214,6 +212,11 @@ class LeaveManagementPage {
 
 		this.bind_events();
 		
+		// Set default dates
+		let today = frappe.datetime.get_today();
+		this.wrapper.find('#filter-from-date').val(frappe.datetime.add_days(today, -1));
+		this.wrapper.find('#filter-to-date').val(frappe.datetime.add_days(today, 1));
+
 		// Trigger initial tab view logic for filters
 		this.update_tab_ui();
 	}
@@ -287,7 +290,7 @@ class LeaveManagementPage {
 			this.show_balances_dialog();
 		});
 
-		this.wrapper.find('#btn-filter').on('click', () => {
+		this.wrapper.find('#filter-from-date, #filter-to-date, #filter-leave-type, #filter-status, #filter-dep, #filter-printed').on('change', () => {
 			this.load_data();
 		});
 
@@ -444,7 +447,7 @@ class LeaveManagementPage {
 
 	render_skeleton() {
 		let html = '';
-		let cols = this.current_tab === 'follow_up_leaves' ? 10 : 9;
+		let cols = this.current_tab === 'follow_up_leaves' ? 9 : 8;
 		for (let i = 0; i < 5; i++) {
 			html += `
 				<tr class="lm-skeleton-row">
@@ -456,7 +459,6 @@ class LeaveManagementPage {
 							<div class="lm-skeleton" style="flex:1"></div>
 							<div class="lm-skeleton" style="flex:0.5"></div>
 							<div class="lm-skeleton" style="flex:2"></div>
-							<div class="lm-skeleton" style="flex:1"></div>
 							<div class="lm-skeleton" style="flex:1.5"></div>
 							<div class="lm-skeleton" style="flex:1.5"></div>
 							<div class="lm-skeleton" style="flex:1"></div>
@@ -550,7 +552,6 @@ class LeaveManagementPage {
 			<th>من تاريخ</th>
 			<th>الأيام</th>
 			<th>السبب</th>
-			<th>المرفقات</th>
 			<th>الحالة</th>
 			<th>القسم</th>
 			<th>الإجراءات</th>
@@ -559,7 +560,7 @@ class LeaveManagementPage {
 		if (data.length === 0) {
 			tbody.html(`
 				<tr>
-					<td colspan="${this.current_tab === 'follow_up_leaves' ? 10 : 9}">
+					<td colspan="${this.current_tab === 'follow_up_leaves' ? 9 : 8}">
 						<div class="lm-empty">
 							<div class="empty-icon">📁</div>
 							<p>لا توجد بيانات لعرضها</p>
@@ -580,8 +581,6 @@ class LeaveManagementPage {
 			let can_cancel = this.current_tab === 'my_leaves' && row.workflow_state === 'Approved' && row.to_date >= frappe.datetime.nowdate() && row.leave_type !== 'إلغاء إجازة';
 			let can_withdraw = (this.current_tab === 'my_leaves' || this.current_tab === 'proxy_leaves') && (row.workflow_state === 'Pending' || row.workflow_state === 'Applied');
 
-			let attachment_btn = row.attachment ? `<button class="lm-action-btn detail" onclick="window.open('${row.attachment}', 'Attachment', 'width=800,height=800'); return false;">عرض</button>` : '-';
-
 			let checkbox_td = '';
 			if (this.current_tab === 'follow_up_leaves') {
 				let checked = this.selected_leaves.includes(row.name) ? 'checked' : '';
@@ -593,8 +592,18 @@ class LeaveManagementPage {
 				status_badges += ` <span class="lm-status printed"><span class="status-dot"></span>مطبوع</span>`;
 			}
 
+			let is_read = row.is_read ? 1 : 0;
+			let row_class = '';
+			let read_badge = '';
+			if (this.current_tab === 'follow_up_leaves') {
+				row_class = is_read ? 'lm-row-read' : 'lm-row-unread';
+				let read_btn_text = is_read ? 'مقروء' : 'غير مقروء';
+				let read_btn_class = is_read ? 'btn-read' : 'btn-unread';
+				read_badge = `<button class="lm-action-btn toggle-read ${read_btn_class}" data-name="${row.name}" data-read="${is_read}" style="margin-left: 5px; font-size: 11px; padding: 4px 8px;">${read_btn_text}</button>`;
+			}
+
 			let tr = $(`
-				<tr>
+				<tr class="${row_class}">
 					${checkbox_td}
 					<td><b>${row.employee_fullname || row.employee}</b></td>
 					<td>
@@ -604,10 +613,10 @@ class LeaveManagementPage {
 					<td>${row.from_date}</td>
 					<td><b>${row.is_time_leave ? (row.number_of_hours + ' ساعات') : row.days}</b></td>
 					<td style="max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${row.reason || ''}">${reason_text}</td>
-					<td>${attachment_btn}</td>
 					<td>${status_badges}</td>
 					<td>${row.dep || '-'}</td>
 					<td>
+							${read_badge}
 							<button class="lm-action-btn print-pdf" data-name="${row.name}" style="background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; margin-left: 5px;">طباعة</button>
 							<button class="lm-action-btn detail" data-name="${row.name}">${needs_action ? 'إجراء' : 'تفاصيل'}</button>
 							${can_cancel ? `<button class="lm-action-btn stop-leave btn-warning" data-name="${row.name}" style="margin-right: 5px; background-color: #f59e0b; color: white; border: none;">قطع</button>` : ''}
@@ -620,6 +629,22 @@ class LeaveManagementPage {
 			tr.find('.detail').on('click', () => {
 				this.show_details_dialog(row);
 			});
+
+			if (this.current_tab === 'follow_up_leaves') {
+				tr.find('.toggle-read').on('click', (e) => {
+					e.stopPropagation();
+					let new_read = is_read ? 0 : 1;
+					frappe.call({
+						method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.toggle_leave_read',
+						args: { leave_name: row.name, is_read: new_read },
+						callback: (r) => {
+							if (!r.exc) {
+								this.load_data();
+							}
+						}
+					});
+				});
+			}
 
 			if (can_cancel) {
 				tr.find('.stop-leave').on('click', (e) => {

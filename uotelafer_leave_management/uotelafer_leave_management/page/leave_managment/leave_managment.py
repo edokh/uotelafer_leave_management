@@ -193,20 +193,36 @@ def get_all_leaves(from_date=None, to_date=None, leave_type=None, status=None, d
     elif printed == "Not Printed":
         filters["printed"] = 0
 
-    leaves = frappe.get_all(
-        "Leave",
-        filters=filters,
-        fields=[
-            "name", "employee", "employee_fullname", "dep",
-            "leave_type", "original_leave", "from_date", "to_date", "days",
-            "is_time_leave", "number_of_hours",
-            "reason", "workflow_state", "status",
-            "date_of_application", "alternative_employee",
-            "supervisor", "attachment", "personal_email", "printed"
-        ],
-        order_by="modified desc",
-        limit_page_length=500,
-    )
+    try:
+        leaves = frappe.get_all(
+            "Leave",
+            filters=filters,
+            fields=[
+                "name", "employee", "employee_fullname", "dep",
+                "leave_type", "original_leave", "from_date", "to_date", "days",
+                "is_time_leave", "number_of_hours",
+                "reason", "workflow_state", "status",
+                "date_of_application", "alternative_employee",
+                "supervisor", "attachment", "personal_email", "printed", "is_read"
+            ],
+            order_by="modified desc",
+            limit_page_length=500,
+        )
+    except Exception:
+        leaves = frappe.get_all(
+            "Leave",
+            filters=filters,
+            fields=[
+                "name", "employee", "employee_fullname", "dep",
+                "leave_type", "original_leave", "from_date", "to_date", "days",
+                "is_time_leave", "number_of_hours",
+                "reason", "workflow_state", "status",
+                "date_of_application", "alternative_employee",
+                "supervisor", "attachment", "personal_email", "printed"
+            ],
+            order_by="modified desc",
+            limit_page_length=500,
+        )
     return leaves
 
 
@@ -683,5 +699,30 @@ def withdraw_leave(leave_name):
     finally:
         frappe.set_user(user)
         
+    return {"status": "success"}
+
+@frappe.whitelist()
+def toggle_leave_read(leave_name, is_read):
+    """Toggle the read state of a leave"""
+    user = frappe.session.user
+    roles = frappe.get_roles(user)
+    settings = frappe.get_cached_doc("Leave Settings")
+    hr_role = settings.hr_employee_role or "HR Employee"
+    if "System Manager" not in roles and "Follow Up Employee" not in roles and hr_role not in roles:
+        frappe.throw(_("Access Denied"))
+
+    try:
+        frappe.db.set_value("Leave", leave_name, "is_read", int(is_read))
+    except Exception:
+        # Create field if missing
+        from frappe.custom.doctype.custom_field.custom_field import create_custom_field
+        create_custom_field('Leave', dict(
+            fieldname='is_read',
+            label='Is Read',
+            fieldtype='Check',
+            default='0'
+        ))
+        frappe.db.set_value("Leave", leave_name, "is_read", int(is_read))
+
     return {"status": "success"}
 
