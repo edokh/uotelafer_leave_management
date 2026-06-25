@@ -1,6 +1,7 @@
 {
  "actions": [],
- "autoname": "LV-.###",
+ "allow_rename": 1,
+ "autoname": "",
  "creation": "2026-04-09 15:37:14.570993",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -20,7 +21,6 @@
   "number_of_hours",
   "from_time",
   "to_time",
-  "number",
   "column_break_fhww",
   "supervisor",
   "supervisor_personal_email",
@@ -38,6 +38,7 @@
   "attachment",
   "section_break_tele",
   "reason",
+  "action_log",
   "print_section",
   "application_date",
   "leaves_after_submission",
@@ -79,6 +80,13 @@
    "fieldtype": "Small Text",
    "label": "Reason",
    "reqd": 1
+  },
+  {
+   "allow_on_submit": 1,
+   "fieldname": "action_log",
+   "fieldtype": "Text",
+   "label": "سجل الإجراءات",
+   "read_only": 1
   },
   {
    "default": "Today",
@@ -273,21 +281,16 @@
    "fieldtype": "Datetime",
    "label": "Approved On",
    "read_only": 1
-  },
-  {
-   "fieldname": "number",
-   "fieldtype": "Data",
-   "label": "Number"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-21 13:59:41.342315",
+ "modified": "2026-06-25 10:40:31.054374",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave",
- "naming_rule": "Expression",
+ "naming_rule": "By \"autoname\" method",
  "owner": "Administrator",
  "permissions": [
   {

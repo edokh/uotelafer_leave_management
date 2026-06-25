@@ -211,11 +211,6 @@ class LeaveManagementPage {
 		}
 
 		this.bind_events();
-		
-		// Set default dates
-		let today = frappe.datetime.get_today();
-		this.wrapper.find('#filter-from-date').val(frappe.datetime.add_days(today, -1));
-		this.wrapper.find('#filter-to-date').val(frappe.datetime.add_days(today, 1));
 
 		// Trigger initial tab view logic for filters
 		this.update_tab_ui();

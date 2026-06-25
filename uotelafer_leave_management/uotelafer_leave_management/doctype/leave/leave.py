@@ -59,6 +59,26 @@ class Leave(Document):
 		if self.workflow_state == "Rejected" or self.status == "Rejected":
 			frappe.db.delete("Leave Balance Transaction", {"note": ["like", f"%{self.name}%"]})
 
+	def autoname(self):
+		# Get formation from department
+		formation = "General"
+		if self.dep:
+			formation = frappe.db.get_value("Leave Department", self.dep, "formation") or "General"
+			
+		year = frappe.utils.today()[:4]
+		series_key = f"LEAVE-{formation}-{year}"
+		
+		# Increment and fetch counter manually to avoid left zero padding
+		frappe.db.sql("INSERT INTO `tabSeries` (name, current) VALUES (%s, 1) ON DUPLICATE KEY UPDATE current = current + 1", (series_key,))
+		counter = frappe.db.sql("SELECT current FROM `tabSeries` WHERE name = %s", (series_key,))[0][0]
+		
+		# Generate the standard western string
+		standard_name = f"أ-{year}-{counter}"
+		
+		# Convert digits to eastern arabic numerals
+		translation_table = str.maketrans('0123456789', '٠١٢٣٤٥٦٧٨٩')
+		self.name = standard_name.translate(translation_table)
+
 	def before_save(self):
 		if not self.is_new():
 			old_doc = self.get_doc_before_save()

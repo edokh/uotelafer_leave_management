@@ -226,6 +226,20 @@ def get_all_leaves(from_date=None, to_date=None, leave_type=None, status=None, d
     return leaves
 
 
+def _append_action_log(doc, message, user=None):
+    if not user:
+        user = frappe.session.user
+    if user == "System":
+        user_display = "النظام التلقائي (System)"
+    else:
+        user_name = frappe.db.get_value("User", user, "full_name") or user
+        user_display = f"{user_name} ({user})"
+    timestamp = frappe.utils.now()
+    current_log = doc.action_log or ""
+    entry = f"[{timestamp}] - {message} - {user_display}\n"
+    doc.action_log = current_log + entry
+
+
 @frappe.whitelist()
 def apply_workflow_action(leave_name, action, comment=None):
     """Apply workflow action (Approve/Reject) with optional comment"""
@@ -270,17 +284,38 @@ def apply_workflow_action(leave_name, action, comment=None):
             if "System Manager" not in roles:
                 frappe.throw(_("Access Denied or invalid workflow transition via this endpoint."))
 
-    frappe.set_user("Administrator")
-    try:
-        frappe.model.workflow.apply_workflow(doc, action)
-        if doc.workflow_state == "Approved":
+    if action == "Approve":
+        if doc.workflow_state == "Applied":
+            doc.workflow_state = "Approved By Department"
+            doc.status = "Pending"
+            doc.date_of_supervisor_action = frappe.utils.today()
+            _append_action_log(doc, "موافقة رئيس القسم", user)
+            doc.save(ignore_permissions=True)
+        elif doc.workflow_state == "Approved By Department":
+            doc.workflow_state = "Approved"
+            doc.status = "Approved"
+            doc.date_of_presidant_action = frappe.utils.today()
             doc.approved_by = user
             doc.approved_by_name = frappe.db.get_value("User", user, "full_name") or user
             doc.approved_by_email = frappe.db.get_value("User", user, "email") or user
             doc.approved_on = frappe.utils.now_datetime()
+            _append_action_log(doc, "الموافقة النهائية (العمادة/الرئاسة)", user)
+            doc.flags.ignore_permissions = True
+            doc.submit()
+    elif action == "Reject":
+        if doc.workflow_state == "Applied":
+            doc.date_of_supervisor_action = frappe.utils.today()
+        else:
+            doc.date_of_presidant_action = frappe.utils.today()
+        doc.workflow_state = "Rejected"
+        doc.status = "Rejected"
+        _append_action_log(doc, "رفض الطلب", user)
         doc.save(ignore_permissions=True)
-    finally:
-        frappe.set_user(user)
+    elif action == "Apply":
+        doc.workflow_state = "Applied"
+        doc.status = "Pending"
+        _append_action_log(doc, "إعادة تقديم الطلب", user)
+        doc.save(ignore_permissions=True)
 
     return {"status": "success", "new_state": doc.workflow_state}
 
@@ -487,32 +522,33 @@ def create_leave(leave_type, from_date, to_date, reason, dep, employee=None, emp
     if original_leave:
         doc.original_leave = original_leave
 
+    doc.workflow_state = "Pending"
+    doc.status = "Draft"
+    _append_action_log(doc, "إنشاء طلب الإجازة", user)
     doc.insert()
 
     # Apply the "Apply" workflow action to move from Pending -> Applied
     try:
-        frappe.model.workflow.apply_workflow(doc, "Apply")
+        doc.workflow_state = "Applied"
+        doc.status = "Pending"
+        _append_action_log(doc, "تقديم الطلب للتدقيق", user)
         doc.save(ignore_permissions=True)
     except Exception:
         pass
 
     # Auto-advance for single-approval formations:
-    # If the employee's department belongs to a formation with single_approval=1,
-    # automatically approve at department level
     if doc.workflow_state == "Applied" and doc.dep:
         try:
             formation = frappe.db.get_value("Leave Department", doc.dep, "formation")
             if formation:
                 is_single = frappe.db.get_value("Leave Formation", formation, "single_approval")
                 if is_single:
-                    frappe.set_user("Administrator")
-                    try:
-                        frappe.model.workflow.apply_workflow(doc, "Approve")
-                        doc.date_of_supervisor_action = frappe.utils.today()
-                        doc.save(ignore_permissions=True)
-                        doc.add_comment("Comment", "تمت الموافقة التلقائية من القسم - نظام الموافقة الواحدة")
-                    finally:
-                        frappe.set_user(user)
+                    doc.workflow_state = "Approved By Department"
+                    doc.status = "Pending"
+                    doc.date_of_supervisor_action = frappe.utils.today()
+                    _append_action_log(doc, "موافقة تلقائية من القسم (نظام الموافقة الواحدة)", "System")
+                    doc.save(ignore_permissions=True)
+                    doc.add_comment("Comment", "تمت الموافقة التلقائية من القسم - نظام الموافقة الواحدة")
         except Exception:
             pass
 
@@ -681,23 +717,23 @@ def withdraw_leave(leave_name):
     if doc.workflow_state not in ["Pending", "Applied"]:
         frappe.throw(_("You can only withdraw leaves that have not yet been approved by the department."))
         
-    frappe.set_user("Administrator")
-    try:
-        if doc.docstatus == 1:
-            # Need to cancel it if it's already submitted
-            doc.cancel()
-            
-        frappe.db.set_value("Leave", leave_name, "workflow_state", "Rejected")
-        frappe.db.set_value("Leave", leave_name, "status", "Rejected")
+    if doc.docstatus == 1:
+        doc.flags.ignore_permissions = True
+        doc.cancel()
         
-        # Add comment
-        doc.add_comment("Comment", "تم سحب الإجازة من قبل الموظف")
-        
-        # Explicitly delete any balance transactions (consumption) for this leave just in case
-        frappe.db.delete("Leave Balance Transaction", {"note": ["like", f"%{leave_name}%"]})
-        
-    finally:
-        frappe.set_user(user)
+    frappe.db.set_value("Leave", leave_name, "workflow_state", "Rejected")
+    frappe.db.set_value("Leave", leave_name, "status", "Rejected")
+    
+    current_log = frappe.db.get_value("Leave", leave_name, "action_log") or ""
+    user_name = frappe.db.get_value("User", user, "full_name") or user
+    entry = f"[{frappe.utils.now()}] - سحب الطلب وإلغاؤه - {user_name} ({user})\n"
+    frappe.db.set_value("Leave", leave_name, "action_log", current_log + entry)
+    
+    # Add comment
+    doc.add_comment("Comment", "تم سحب الإجازة من قبل الموظف")
+    
+    # Explicitly delete any balance transactions (consumption) for this leave just in case
+    frappe.db.delete("Leave Balance Transaction", {"note": ["like", f"%{leave_name}%"]})
         
     return {"status": "success"}
 
