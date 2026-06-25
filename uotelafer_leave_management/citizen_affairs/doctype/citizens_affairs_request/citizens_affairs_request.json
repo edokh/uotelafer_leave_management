@@ -1,0 +1,158 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-06-25 11:20:22.461554",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "request_info_section",
+  "full_name",
+  "phone_number",
+  "email",
+  "column_break_info",
+  "target_department",
+  "status",
+  "creation_date",
+  "request_details_section",
+  "request_details",
+  "reply_section",
+  "reply_text",
+  "column_break_reply",
+  "replied_by",
+  "replied_on"
+ ],
+ "fields": [
+  {
+   "fieldname": "request_info_section",
+   "fieldtype": "Section Break",
+   "label": "معلومات الطلب"
+  },
+  {
+   "fieldname": "full_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "الاسم الكامل",
+   "reqd": 1
+  },
+  {
+   "fieldname": "phone_number",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "رقم الهاتف",
+   "options": "Phone",
+   "reqd": 1
+  },
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "البريد الإلكتروني",
+   "options": "Email",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_info",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "target_department",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "الجهة المعنية",
+   "options": "Leave Department",
+   "reqd": 1
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "الحالة",
+   "options": "Open\nReplied\nClosed"
+  },
+  {
+   "default": "Today",
+   "fieldname": "creation_date",
+   "fieldtype": "Date",
+   "label": "تاريخ التقديم",
+   "read_only": 1
+  },
+  {
+   "fieldname": "request_details_section",
+   "fieldtype": "Section Break",
+   "label": "تفاصيل الطلب"
+  },
+  {
+   "fieldname": "request_details",
+   "fieldtype": "Text",
+   "label": "تفاصيل الطلب",
+   "reqd": 1
+  },
+  {
+   "depends_on": "eval:doc.status=='Replied' || doc.status=='Closed'",
+   "fieldname": "reply_section",
+   "fieldtype": "Section Break",
+   "label": "الرد"
+  },
+  {
+   "fieldname": "reply_text",
+   "fieldtype": "Text",
+   "label": "نص الرد"
+  },
+  {
+   "fieldname": "column_break_reply",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "replied_by",
+   "fieldtype": "Link",
+   "label": "تم الرد من قبل",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "replied_on",
+   "fieldtype": "Datetime",
+   "label": "تاريخ الرد",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-06-25 11:20:22.461554",
+ "modified_by": "Administrator",
+ "module": "Citizen Affairs",
+ "name": "Citizens Affairs Request",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "role": "Guest"
+  },
+  {
+   "read": 1,
+   "role": "Department Head",
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "full_name",
+ "show_title_field_in_link": 1
+}

@@ -9,7 +9,9 @@
   "presidant_office_role",
   "presidant_role",
   "hr_employee_role",
-  "number_of_days_for_presidant_approval"
+  "number_of_days_for_presidant_approval",
+  "citizen_affairs_section",
+  "citizens_affairs_admin_role"
  ],
  "fields": [
   {
@@ -41,13 +43,25 @@
    "fieldtype": "Link",
    "label": "HR Employee Role",
    "options": "Role"
+  },
+  {
+   "fieldname": "citizen_affairs_section",
+   "fieldtype": "Section Break",
+   "label": "Citizen Affairs Settings"
+  },
+  {
+   "description": "Role that can view all departments' citizen affairs requests",
+   "fieldname": "citizens_affairs_admin_role",
+   "fieldtype": "Link",
+   "label": "Citizens Affairs Admin Role",
+   "options": "Role"
   }
  ],
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-06-07 13:49:44.796862",
+ "modified": "2026-06-25 11:30:00.000000",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave Settings",

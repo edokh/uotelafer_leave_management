@@ -43,3 +43,13 @@ jinja = {
         "uotelafer_leave_management.utils.get_qr_code"
     ]
 }
+
+# Allow guest access to citizen affairs request page
+website_route_rules = [
+    {"from_route": "/citizen-affairs-request", "to_route": "citizen_affairs_request"},
+]
+
+# Guest access for citizen affairs APIs
+guest_methods = [
+    "uotelafer_leave_management.citizen_affairs.doctype.citizens_affairs_request.citizens_affairs_request.submit_citizen_request"
+]

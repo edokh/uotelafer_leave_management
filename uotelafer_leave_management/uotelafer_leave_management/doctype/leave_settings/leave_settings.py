@@ -8,6 +8,7 @@ from frappe.model.document import Document
 class LeaveSettings(Document):
 	def on_update(self):
 		self.update_page_roles()
+		self.update_citizen_affairs_page_roles()
 		self.update_workflow_roles()
 
 	def update_page_roles(self):
@@ -34,6 +35,29 @@ class LeaveSettings(Document):
 
 		if self.hr_employee_role and self.hr_employee_role not in roles:
 			roles.append(self.hr_employee_role)
+
+		page.roles = []
+		for role in roles:
+			page.append("roles", {"role": role})
+
+		page.save(ignore_permissions=True)
+
+	def update_citizen_affairs_page_roles(self):
+		"""Sync roles to the Citizens Affairs Management page."""
+		if not frappe.db.exists("Page", "citizens-affairs-mgm"):
+			return
+
+		page = frappe.get_doc("Page", "citizens-affairs-mgm")
+
+		roles = ["System Manager"]
+
+		# Add the department head role
+		if self.department_head_role and self.department_head_role not in roles:
+			roles.append(self.department_head_role)
+
+		# Add the citizens affairs admin role
+		if self.citizens_affairs_admin_role and self.citizens_affairs_admin_role not in roles:
+			roles.append(self.citizens_affairs_admin_role)
 
 		page.roles = []
 		for role in roles:
