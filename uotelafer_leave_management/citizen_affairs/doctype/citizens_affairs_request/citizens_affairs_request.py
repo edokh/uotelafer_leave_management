@@ -7,6 +7,16 @@ from frappe.model.document import Document
 
 
 class CitizensAffairsRequest(Document):
+	def autoname(self):
+		import random
+		
+		# Generate a 4-digit random number
+		while True:
+			# using randint ensures we get digits (0-9). zfill pads it to 4 digits (e.g. 0123)
+			rand_name = str(random.randint(0, 9999)).zfill(4)
+			if not frappe.db.exists("Citizens Affairs Request", rand_name):
+				self.name = rand_name
+				break
 	def after_insert(self):
 		self.notify_department_head()
 
