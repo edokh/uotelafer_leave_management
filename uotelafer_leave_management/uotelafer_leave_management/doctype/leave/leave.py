@@ -72,8 +72,9 @@ class Leave(Document):
 		frappe.db.sql("INSERT INTO `tabSeries` (name, current) VALUES (%s, 1) ON DUPLICATE KEY UPDATE current = current + 1", (series_key,))
 		counter = frappe.db.sql("SELECT current FROM `tabSeries` WHERE name = %s", (series_key,))[0][0]
 		
-		# Generate the standard western string
-		standard_name = f"أ-{year}-{counter}"
+		# Generate the standard western string with formation to prevent duplicate names across formations
+		formation_display = "عام" if formation == "General" else formation
+		standard_name = f"أ-{formation_display}-{year}-{counter}"
 		
 		# Convert digits to eastern arabic numerals
 		translation_table = str.maketrans('0123456789', '٠١٢٣٤٥٦٧٨٩')
