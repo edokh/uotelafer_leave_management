@@ -290,6 +290,8 @@ def apply_workflow_action(leave_name, action, comment=None):
             doc.status = "Pending"
             doc.date_of_supervisor_action = frappe.utils.today()
             _append_action_log(doc, "موافقة رئيس القسم", user)
+            doc.flags.ignore_permissions = True
+            doc.flags.ignore_workflow_validation = True
             doc.save(ignore_permissions=True)
         elif doc.workflow_state == "Approved By Department":
             doc.workflow_state = "Approved"
@@ -301,6 +303,7 @@ def apply_workflow_action(leave_name, action, comment=None):
             doc.approved_on = frappe.utils.now_datetime()
             _append_action_log(doc, "الموافقة النهائية (العمادة/الرئاسة)", user)
             doc.flags.ignore_permissions = True
+            doc.flags.ignore_workflow_validation = True
             doc.submit()
     elif action == "Reject":
         if doc.workflow_state == "Applied":
@@ -310,11 +313,15 @@ def apply_workflow_action(leave_name, action, comment=None):
         doc.workflow_state = "Rejected"
         doc.status = "Rejected"
         _append_action_log(doc, "رفض الطلب", user)
+        doc.flags.ignore_permissions = True
+        doc.flags.ignore_workflow_validation = True
         doc.save(ignore_permissions=True)
     elif action == "Apply":
         doc.workflow_state = "Applied"
         doc.status = "Pending"
         _append_action_log(doc, "إعادة تقديم الطلب", user)
+        doc.flags.ignore_permissions = True
+        doc.flags.ignore_workflow_validation = True
         doc.save(ignore_permissions=True)
 
     return {"status": "success", "new_state": doc.workflow_state}
@@ -532,6 +539,8 @@ def create_leave(leave_type, from_date, to_date, reason, dep, employee=None, emp
         doc.workflow_state = "Applied"
         doc.status = "Pending"
         _append_action_log(doc, "تقديم الطلب للتدقيق", user)
+        doc.flags.ignore_permissions = True
+        doc.flags.ignore_workflow_validation = True
         doc.save(ignore_permissions=True)
     except Exception:
         pass
@@ -547,6 +556,8 @@ def create_leave(leave_type, from_date, to_date, reason, dep, employee=None, emp
                     doc.status = "Pending"
                     doc.date_of_supervisor_action = frappe.utils.today()
                     _append_action_log(doc, "موافقة تلقائية من القسم (نظام الموافقة الواحدة)", "System")
+                    doc.flags.ignore_permissions = True
+                    doc.flags.ignore_workflow_validation = True
                     doc.save(ignore_permissions=True)
                     doc.add_comment("Comment", "تمت الموافقة التلقائية من القسم - نظام الموافقة الواحدة")
         except Exception:
@@ -719,6 +730,7 @@ def withdraw_leave(leave_name):
         
     if doc.docstatus == 1:
         doc.flags.ignore_permissions = True
+        doc.flags.ignore_workflow_validation = True
         doc.cancel()
         
     frappe.db.set_value("Leave", leave_name, "workflow_state", "Rejected")
