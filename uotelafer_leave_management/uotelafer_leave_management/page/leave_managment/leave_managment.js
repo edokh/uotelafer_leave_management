@@ -15,6 +15,7 @@ class LeaveManagementPage {
 		this.user_roles = {};
 		this.current_tab = 'my_leaves';
 		this.selected_leaves = [];
+		this.approval_level_names = {};
 
 		frappe.require('leave_managment.css', () => {
 			this.init();
@@ -22,9 +23,17 @@ class LeaveManagementPage {
 	}
 
 	async init() {
-		// Fetch roles
-		let r = await frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_user_roles" });
-		this.user_roles = r.message || {};
+		// Fetch roles and approval level names in parallel
+		let [roles_res, levels_res] = await Promise.all([
+			frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_user_roles" }),
+			frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_approval_level_names" })
+		]);
+		this.user_roles = roles_res.message || {};
+		let level_names = levels_res.message || [];
+		this.approval_level_names = {};
+		level_names.forEach(l => {
+			this.approval_level_names[l.level] = l.name;
+		});
 
 		this.user_fullname = frappe.session.user_fullname;
 		try {
@@ -65,14 +74,10 @@ class LeaveManagementPage {
 		this.leave_employees = emp_res.message || [];
 
 		// Determine default tab
-		if (this.user_roles.is_follow_up && !this.user_roles.is_employee && !this.user_roles.is_president && !this.user_roles.is_president_office && !this.user_roles.is_dept_head && !this.user_roles.is_single_approver) {
+		if (this.user_roles.is_follow_up && !this.user_roles.is_employee && !this.user_roles.is_approver) {
 			this.current_tab = 'follow_up_leaves';
-		} else if (this.user_roles.is_single_approver && !this.user_roles.is_employee && !this.user_roles.is_president && !this.user_roles.is_president_office && !this.user_roles.is_dept_head) {
-			this.current_tab = 'single_approval_leaves';
-		} else if ((this.user_roles.is_president || this.user_roles.is_president_office) && !this.user_roles.is_employee) {
-			this.current_tab = 'president_leaves';
-		} else if (this.user_roles.is_dept_head && !this.user_roles.is_employee) {
-			this.current_tab = 'department_leaves';
+		} else if (this.user_roles.is_approver && !this.user_roles.is_employee) {
+			this.current_tab = 'pending_approval';
 		} else if (this.user_roles.is_proxy_submitter && !this.user_roles.is_employee) {
 			this.current_tab = 'proxy_leaves';
 		}
@@ -108,9 +113,7 @@ class LeaveManagementPage {
 				<div class="lm-tabs">
 					${this.user_roles.is_employee ? `<button class="lm-tab ${this.current_tab === 'my_leaves' ? 'active' : ''}" data-tab="my_leaves">إجازاتي</button>` : ''}
 					${this.user_roles.is_proxy_submitter ? `<button class="lm-tab ${this.current_tab === 'proxy_leaves' ? 'active' : ''}" data-tab="proxy_leaves">التقديم بالنيابة</button>` : ''}
-					${this.user_roles.is_dept_head || this.user_roles.is_admin ? `<button class="lm-tab ${this.current_tab === 'department_leaves' ? 'active' : ''}" data-tab="department_leaves">إجازات القسم</button>` : ''}
-					${this.user_roles.is_single_approver ? `<button class="lm-tab ${this.current_tab === 'single_approval_leaves' ? 'active' : ''}" data-tab="single_approval_leaves">الموافقة النهائية</button>` : ''}
-					${this.user_roles.is_president || this.user_roles.is_president_office || this.user_roles.is_admin ? `<button class="lm-tab ${this.current_tab === 'president_leaves' ? 'active' : ''}" data-tab="president_leaves">موافقات الرئاسة</button>` : ''}
+					${this.user_roles.is_approver ? `<button class="lm-tab ${this.current_tab === 'pending_approval' ? 'active' : ''}" data-tab="pending_approval">بانتظار موافقتي</button>` : ''}
 					${this.user_roles.is_follow_up || this.user_roles.is_admin ? `<button class="lm-tab ${this.current_tab === 'follow_up_leaves' ? 'active' : ''}" data-tab="follow_up_leaves">متابعة الإجازات</button>` : ''}
 				</div>
 
@@ -153,8 +156,8 @@ class LeaveManagementPage {
 						<select id="filter-status">
 							<option value="All">الكل</option>
 							<option value="Pending">قيد الإنتظار</option>
-							<option value="Applied">مقدمة للرئيس المباشر</option>
-							<option value="Approved By Department">موافق عليها من القسم</option>
+							<option value="Applied">بانتظار الموافقة</option>
+							<option value="Approved By Department">موافقة جزئية</option>
 							<option value="Approved">مقبولة</option>
 							<option value="Rejected">مرفوضة</option>
 						</select>
@@ -211,8 +214,6 @@ class LeaveManagementPage {
 		}
 
 		this.bind_events();
-
-		// Trigger initial tab view logic for filters
 		this.update_tab_ui();
 	}
 
@@ -230,30 +231,27 @@ class LeaveManagementPage {
 				<option value="">الكل (مقبولة ومقدمة)</option>
 			`);
 			status_val = "Approved";
-		} else if (this.current_tab === 'single_approval_leaves') {
+		} else if (this.current_tab === 'pending_approval') {
 			this.wrapper.find('#printed-filter-wrapper').hide();
 			this.wrapper.find('#btn-bulk-print').hide();
 			this.wrapper.find('#filter-status').html(`
-				<option value="Approved By Department">بانتظار الموافقة</option>
+				<option value="All">بانتظار الموافقة</option>
 				<option value="Approved">مقبولة</option>
 				<option value="Rejected">مرفوضة</option>
-				<option value="All">الكل</option>
 			`);
-			status_val = "Approved By Department";
+			status_val = "All";
 		} else {
 			this.wrapper.find('#printed-filter-wrapper').hide();
 			this.wrapper.find('#btn-bulk-print').hide();
 			this.wrapper.find('#filter-status').html(`
 				<option value="All">الكل</option>
 				<option value="Pending">قيد الإنتظار</option>
-				<option value="Applied">مقدمة للرئيس المباشر</option>
-				<option value="Approved By Department">موافق عليها من القسم</option>
+				<option value="Applied">بانتظار الموافقة</option>
+				<option value="Approved By Department">موافقة جزئية</option>
 				<option value="Approved">مقبولة</option>
 				<option value="Rejected">مرفوضة</option>
 			`);
-			if (this.current_tab === 'department_leaves') status_val = "All";
-			else if (this.current_tab === 'president_leaves') status_val = "Approved By Department";
-			else status_val = "All";
+			status_val = "All";
 		}
 
 		this.wrapper.find('#filter-status').val(status_val);
@@ -469,23 +467,21 @@ class LeaveManagementPage {
 		this.render_skeleton();
 
 		let method = '';
+		let args = this.get_filters();
+
 		if (this.current_tab === 'my_leaves') {
 			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_employee_leaves';
 		} else if (this.current_tab === 'proxy_leaves') {
 			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_proxy_leaves';
-		} else if (this.current_tab === 'department_leaves') {
-			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_department_leaves';
-		} else if (this.current_tab === 'president_leaves') {
-			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_president_leaves';
-		} else if (this.current_tab === 'single_approval_leaves') {
-			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_single_approval_leaves';
+		} else if (this.current_tab === 'pending_approval') {
+			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_pending_approval_leaves';
 		} else if (this.current_tab === 'follow_up_leaves') {
 			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_all_leaves';
 		}
 
 		let r = await frappe.call({
 			method: method,
-			args: this.get_filters()
+			args: args
 		});
 
 		let data = r.message || [];
@@ -519,14 +515,33 @@ class LeaveManagementPage {
 		`);
 	}
 
-	get_status_html(state) {
+	get_status_html(row) {
+		let state = row.workflow_state;
 		let cls = '';
 		let label = state;
-		if (state === 'Pending') { cls = 'pending'; label = 'قيد الإنتظار'; }
-		else if (state === 'Applied') { cls = 'applied'; label = 'مقدمة للرئيس المباشر'; }
-		else if (state === 'Approved By Department') { cls = 'approved-dept'; label = 'موافق عليها من القسم'; }
-		else if (state === 'Approved') { cls = 'approved'; label = 'مقبولة'; }
-		else if (state === 'Rejected') { cls = 'rejected'; label = 'مرفوضة'; }
+		let current_level = row.current_approval_level || 0;
+		let max_level = row.max_required_level || 1;
+
+		if (state === 'Pending') {
+			cls = 'pending';
+			label = 'قيد الإنتظار';
+		} else if (state === 'Applied') {
+			cls = 'applied';
+			let next_level = 1;
+			let level_name = this.approval_level_names[next_level] || `المستوى ${next_level}`;
+			label = `بانتظار ${level_name}`;
+		} else if (state === 'Approved By Department') {
+			cls = 'approved-dept';
+			let next_level = current_level + 1;
+			let level_name = this.approval_level_names[next_level] || `المستوى ${next_level}`;
+			label = `بانتظار ${level_name}`;
+		} else if (state === 'Approved') {
+			cls = 'approved';
+			label = 'مقبولة';
+		} else if (state === 'Rejected') {
+			cls = 'rejected';
+			label = 'مرفوضة';
+		}
 
 		return `<span class="lm-status ${cls}"><span class="status-dot"></span>${label}</span>`;
 	}
@@ -569,10 +584,8 @@ class LeaveManagementPage {
 		data.forEach(row => {
 			let reason_text = row.reason ? (row.reason.length > 30 ? row.reason.substring(0, 30) + '...' : row.reason) : '-';
 
-			let can_approve_dept = this.current_tab === 'department_leaves' && row.workflow_state === 'Applied';
-			let can_approve_pres = this.current_tab === 'president_leaves' && row.workflow_state === 'Approved By Department';
-			let can_approve_single = this.current_tab === 'single_approval_leaves' && row.workflow_state === 'Approved By Department';
-			let needs_action = can_approve_dept || can_approve_pres || can_approve_single;
+			// Determine if this row needs approval action from the current user
+			let can_approve = this.current_tab === 'pending_approval' && (row.workflow_state === 'Applied' || row.workflow_state === 'Approved By Department');
 			let can_cancel = this.current_tab === 'my_leaves' && row.workflow_state === 'Approved' && row.to_date >= frappe.datetime.nowdate() && row.leave_type !== 'إلغاء إجازة';
 			let can_withdraw = (this.current_tab === 'my_leaves' || this.current_tab === 'proxy_leaves') && (row.workflow_state === 'Pending' || row.workflow_state === 'Applied');
 
@@ -582,7 +595,7 @@ class LeaveManagementPage {
 				checkbox_td = `<td><input type="checkbox" class="chk-select-row" data-name="${row.name}" ${checked}></td>`;
 			}
 
-			let status_badges = this.get_status_html(row.workflow_state);
+			let status_badges = this.get_status_html(row);
 			if (row.printed) {
 				status_badges += ` <span class="lm-status printed"><span class="status-dot"></span>مطبوع</span>`;
 			}
@@ -613,7 +626,7 @@ class LeaveManagementPage {
 					<td>
 							${read_badge}
 							<button class="lm-action-btn print-pdf" data-name="${row.name}" style="background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; margin-left: 5px;">طباعة</button>
-							<button class="lm-action-btn detail" data-name="${row.name}">${needs_action ? 'إجراء' : 'تفاصيل'}</button>
+							<button class="lm-action-btn detail" data-name="${row.name}">${can_approve ? 'إجراء' : 'تفاصيل'}</button>
 							${can_cancel ? `<button class="lm-action-btn stop-leave btn-warning" data-name="${row.name}" style="margin-right: 5px; background-color: #f59e0b; color: white; border: none;">قطع</button>` : ''}
 							${can_withdraw ? `<button class="lm-action-btn withdraw-leave btn-danger" data-name="${row.name}" style="margin-right: 5px; background-color: #ef4444; color: white; border: none;">سحب</button>` : ''}
 						</div>
@@ -764,7 +777,6 @@ class LeaveManagementPage {
 									dialog.set_value('employee_fullname', emp_doc.full_name);
 									dialog.set_value('dep', emp_doc.leave_department);
 									dialog.set_value('employee_user', emp_doc.user);
-									// Query last personal email
 									frappe.call({
 										method: "frappe.client.get_list",
 										args: {
@@ -996,10 +1008,7 @@ class LeaveManagementPage {
 	}
 
 	async show_details_dialog(row) {
-		let can_approve_dept = this.current_tab === 'department_leaves' && row.workflow_state === 'Applied';
-		let can_approve_pres = this.current_tab === 'president_leaves' && row.workflow_state === 'Approved By Department';
-		let can_approve_single = this.current_tab === 'single_approval_leaves' && row.workflow_state === 'Approved By Department';
-		let needs_action = can_approve_dept || can_approve_pres || can_approve_single;
+		let can_approve = this.current_tab === 'pending_approval' && (row.workflow_state === 'Applied' || row.workflow_state === 'Approved By Department');
 
 		let r = await frappe.call({
 			method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_leave_comments',
@@ -1008,7 +1017,7 @@ class LeaveManagementPage {
 		let comments = r.message || [];
 
 		let balance_html = '';
-		if (needs_action) {
+		if (can_approve) {
 			let balance_r = await frappe.call({
 				method: 'uotelafer_leave_management.uotelafer_leave_management.doctype.leave.leave.get_leave_balance',
 				args: { employee: row.employee, leave_type: row.leave_type, current_leave_name: row.name }
@@ -1037,8 +1046,30 @@ class LeaveManagementPage {
 			`;
 		}
 
+		// Build approval trail
+		let approval_trail_html = '';
+		let level_approvals = [];
+		try {
+			level_approvals = JSON.parse(row.level_approvals || '[]');
+		} catch (e) {}
+		if (level_approvals.length > 0) {
+			approval_trail_html = `
+				<div class="lm-detail-item full-width" style="background: #f0f9ff; border: 1px solid #bae6fd; padding: 12px; border-radius: 8px; margin-bottom: 10px;">
+					<div class="detail-label" style="color: #0369a1; margin-bottom: 8px; font-weight: bold;">سجل الموافقات</div>
+					${level_approvals.map(la => `
+						<div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #e0f2fe;">
+							<span style="color: #0c4a6e; font-weight: 600;">${la.level_name || 'المستوى ' + la.level}</span>
+							<span style="color: #0369a1;">${la.user_name}</span>
+							<span style="color: #64748b; font-size: 12px;">${la.date}</span>
+						</div>
+					`).join('')}
+				</div>
+			`;
+		}
+
 		let dialog_html = `
 			${balance_html}
+			${approval_trail_html}
 			<div class="lm-detail-grid">
 				<div class="lm-detail-item">
 					<div class="detail-label">الموظف</div>
@@ -1071,7 +1102,7 @@ class LeaveManagementPage {
 				</div>
 				<div class="lm-detail-item full-width">
 					<div class="detail-label">الحالة الحالية</div>
-					<div class="detail-value" style="margin-top:5px;">${this.get_status_html(row.workflow_state)}</div>
+					<div class="detail-value" style="margin-top:5px;">${this.get_status_html(row)}</div>
 				</div>
 				<div class="lm-detail-item full-width">
 					<div class="detail-label">السبب</div>
@@ -1098,7 +1129,7 @@ class LeaveManagementPage {
 					`).join('') : '<div style="color:var(--text-muted); font-size:13px;">لا توجد تعليقات</div>'}
 				</div>
 				
-				${needs_action ? `
+				${can_approve ? `
 					<div class="lm-field">
 						<label>إضافة ملاحظة (اختياري)</label>
 						<textarea id="action-comment" placeholder="اكتب ملاحظاتك هنا..."></textarea>
@@ -1116,7 +1147,7 @@ class LeaveManagementPage {
 			fields: fields,
 		};
 
-		if (needs_action) {
+		if (can_approve) {
 			dialog_options.primary_action_label = 'موافقة';
 			dialog_options.primary_action = () => {
 				let comment = dialog.get_field('html_content').$wrapper.find('#action-comment').val();
@@ -1137,36 +1168,34 @@ class LeaveManagementPage {
 			window.open(url, '_blank');
 		});
 
-		if (needs_action) {
+		if (can_approve) {
 			dialog.get_primary_btn().removeClass('btn-primary').addClass('btn-success');
 			dialog.get_secondary_btn().removeClass('btn-default').addClass('btn-danger');
 
-			if (this.current_tab === 'department_leaves') {
-				dialog.add_custom_action('إلغاء لعدم الانتماء للقسم', () => {
-					frappe.confirm('هل أنت متأكد من إلغاء وحذف هذا الطلب لعدم انتماء الموظف للقسم؟', () => {
-						frappe.call({
-							method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.remove_wrong_department_leave',
-							args: { leave_name: row.name },
-							freeze: true,
-							callback: (r) => {
-								if (!r.exc) {
-									frappe.show_alert({ message: 'تم إلغاء وحذف الإجازة بنجاح', indicator: 'green' });
-									dialog.hide();
-									this.load_data();
-								}
+			// Add "remove wrong department" action
+			dialog.add_custom_action('إلغاء لعدم الانتماء للقسم', () => {
+				frappe.confirm('هل أنت متأكد من إلغاء وحذف هذا الطلب لعدم انتماء الموظف للقسم؟', () => {
+					frappe.call({
+						method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.remove_wrong_department_leave',
+						args: { leave_name: row.name },
+						freeze: true,
+						callback: (r) => {
+							if (!r.exc) {
+								frappe.show_alert({ message: 'تم إلغاء وحذف الإجازة بنجاح', indicator: 'green' });
+								dialog.hide();
+								this.load_data();
 							}
-						});
-					});
-				});
-				// Style the custom action button
-				setTimeout(() => {
-					dialog.$wrapper.find('.btn-custom').each(function() {
-						if ($(this).text().includes('إلغاء لعدم الانتماء للقسم')) {
-							$(this).removeClass('btn-default').addClass('btn-warning').css({'color': 'white', 'background-color': '#f59e0b', 'border': 'none'});
 						}
 					});
-				}, 10);
-			}
+				});
+			});
+			setTimeout(() => {
+				dialog.$wrapper.find('.btn-custom').each(function() {
+					if ($(this).text().includes('إلغاء لعدم الانتماء للقسم')) {
+						$(this).removeClass('btn-default').addClass('btn-warning').css({'color': 'white', 'background-color': '#f59e0b', 'border': 'none'});
+					}
+				});
+			}, 10);
 		}
 
 		dialog.show();

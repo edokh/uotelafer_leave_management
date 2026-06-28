@@ -5,44 +5,59 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "department_head_role",
-  "presidant_office_role",
-  "presidant_role",
   "hr_employee_role",
-  "number_of_days_for_presidant_approval",
+  "approval_levels_section",
+  "approval_levels",
+  "approver_mappings_section",
+  "approver_mappings",
+  "department_visibility_section",
+  "department_visibility",
   "citizen_affairs_section",
   "citizens_affairs_admin_role"
  ],
  "fields": [
   {
-   "fieldname": "department_head_role",
-   "fieldtype": "Link",
-   "label": "Department Head Role",
-   "options": "Role"
-  },
-  {
-   "fieldname": "presidant_office_role",
-   "fieldtype": "Link",
-   "label": "Presidant Office Role",
-   "options": "Role"
-  },
-  {
-   "fieldname": "presidant_role",
-   "fieldtype": "Link",
-   "label": "Presidant Role",
-   "options": "Role"
-  },
-  {
-   "default": "3",
-   "fieldname": "number_of_days_for_presidant_approval",
-   "fieldtype": "Int",
-   "label": "Number of Days For Presidant approval"
-  },
-  {
    "fieldname": "hr_employee_role",
    "fieldtype": "Link",
    "label": "HR Employee Role",
    "options": "Role"
+  },
+  {
+   "fieldname": "approval_levels_section",
+   "fieldtype": "Section Break",
+   "label": "Approval Levels"
+  },
+  {
+   "description": "Define approval levels in order. Each level can have a day-count range. Level 1 is the first approver, Level 2 the second, etc.",
+   "fieldname": "approval_levels",
+   "fieldtype": "Table",
+   "label": "Approval Levels",
+   "options": "Leave Approval Level",
+   "reqd": 1
+  },
+  {
+   "fieldname": "approver_mappings_section",
+   "fieldtype": "Section Break",
+   "label": "Approver Mappings"
+  },
+  {
+   "description": "Map users to the departments they can approve and at which level. A user can approve multiple departments at the same level.",
+   "fieldname": "approver_mappings",
+   "fieldtype": "Table",
+   "label": "Approver Mappings",
+   "options": "Leave Approver Mapping"
+  },
+  {
+   "fieldname": "department_visibility_section",
+   "fieldtype": "Section Break",
+   "label": "Department Visibility (Follow Up / HR)"
+  },
+  {
+   "description": "Control which departments Follow Up and HR users can see. If a user has no entries here, they see ALL departments.",
+   "fieldname": "department_visibility",
+   "fieldtype": "Table",
+   "label": "Department Visibility",
+   "options": "Leave Department Visibility"
   },
   {
    "fieldname": "citizen_affairs_section",
@@ -61,7 +76,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-06-25 11:30:00.000000",
+ "modified": "2026-06-28 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave Settings",

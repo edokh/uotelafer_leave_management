@@ -1,0 +1,76 @@
+{
+ "actions": [],
+ "creation": "2026-06-28 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "level",
+  "level_name",
+  "column_break_1",
+  "min_days",
+  "max_days",
+  "section_break_2",
+  "role"
+ ],
+ "fields": [
+  {
+   "fieldname": "level",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Level",
+   "reqd": 1
+  },
+  {
+   "fieldname": "level_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Level Name",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Minimum leave days for this level to be required. 0 means this level always applies.",
+   "fieldname": "min_days",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Min Days"
+  },
+  {
+   "default": "0",
+   "description": "Maximum leave days for this level. 0 means no upper limit. If leave days fall within [min_days, max_days], this level is the final approval level.",
+   "fieldname": "max_days",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Max Days"
+  },
+  {
+   "fieldname": "section_break_2",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "role",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Approver Role",
+   "options": "Role",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-06-28 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Uotelafer Leave Management",
+ "name": "Leave Approval Level",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

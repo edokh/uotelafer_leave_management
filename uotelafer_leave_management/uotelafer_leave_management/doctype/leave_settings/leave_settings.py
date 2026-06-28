@@ -3,38 +3,63 @@
 
 import frappe
 from frappe.model.document import Document
+from frappe import _
 
 
 class LeaveSettings(Document):
+	def validate(self):
+		self.validate_approval_levels()
+		self.validate_approver_mappings()
+
 	def on_update(self):
 		self.update_page_roles()
 		self.update_citizen_affairs_page_roles()
-		self.update_workflow_roles()
+
+	def validate_approval_levels(self):
+		"""Ensure approval levels are sequential starting from 1 with no gaps."""
+		if not self.approval_levels:
+			frappe.throw(_("At least one approval level is required."))
+
+		levels = sorted([row.level for row in self.approval_levels])
+		expected = list(range(1, len(levels) + 1))
+		if levels != expected:
+			frappe.throw(_("Approval levels must be sequential starting from 1 with no gaps. Got: {0}").format(levels))
+
+	def validate_approver_mappings(self):
+		"""Ensure each approver mapping references a valid approval level."""
+		if not self.approval_levels:
+			return
+
+		valid_levels = {row.level for row in self.approval_levels}
+		for mapping in self.approver_mappings or []:
+			if mapping.approval_level not in valid_levels:
+				frappe.throw(
+					_("Approver mapping for {0} references level {1}, which is not defined in Approval Levels.").format(
+						mapping.user, mapping.approval_level
+					)
+				)
 
 	def update_page_roles(self):
-		# Sync roles to the Page
+		"""Sync roles to the Page based on configured approval levels."""
 		if not frappe.db.exists("Page", "leave-managment"):
 			return
 
 		page = frappe.get_doc("Page", "leave-managment")
-		
-		roles = [
+
+		roles = {
 			"University Employee",
 			"Follow Up Employee",
-			"System Manager"
-		]
+			"System Manager",
+		}
 
-		if self.department_head_role and self.department_head_role not in roles:
-			roles.append(self.department_head_role)
-		
-		if self.presidant_role and self.presidant_role not in roles:
-			roles.append(self.presidant_role)
+		# Add roles from all approval levels
+		for level in self.approval_levels or []:
+			if level.role:
+				roles.add(level.role)
 
-		if self.presidant_office_role and self.presidant_office_role not in roles:
-			roles.append(self.presidant_office_role)
-
-		if self.hr_employee_role and self.hr_employee_role not in roles:
-			roles.append(self.hr_employee_role)
+		# Add HR role
+		if self.hr_employee_role:
+			roles.add(self.hr_employee_role)
 
 		page.roles = []
 		for role in roles:
@@ -51,9 +76,10 @@ class LeaveSettings(Document):
 
 		roles = ["System Manager"]
 
-		# Add the department head role
-		if self.department_head_role and self.department_head_role not in roles:
-			roles.append(self.department_head_role)
+		# Add all approval-level roles (they may need access to citizen affairs)
+		for level in self.approval_levels or []:
+			if level.role and level.role not in roles:
+				roles.append(level.role)
 
 		# Add the citizens affairs admin role
 		if self.citizens_affairs_admin_role and self.citizens_affairs_admin_role not in roles:
@@ -64,13 +90,3 @@ class LeaveSettings(Document):
 			page.append("roles", {"role": role})
 
 		page.save(ignore_permissions=True)
-
-	def update_workflow_roles(self):
-		# Standard Frappe workflow allows one role per transition. We will just add transitions for all configured roles.
-		if not frappe.db.exists("Workflow", "Leave Approval"):
-			return
-		
-		# Since we handle approval logic in python with ignore_permissions=True,
-		# updating the Workflow DB is optional, but good for completeness.
-		pass
-
