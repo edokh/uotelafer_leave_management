@@ -416,10 +416,13 @@ def apply_workflow_action(leave_name, action, comment=None):
     is_admin = "System Manager" in roles
 
     if action == "Apply":
-        # Employee re-applying their own leave
-        if not (doc.workflow_state == "Pending" and (user == doc.employee or user == doc.owner)):
-            if not is_admin:
-                frappe.throw(_("Access Denied or invalid workflow transition."))
+        # Employee or proxy applying/re-applying leave
+        can_apply = False
+        if doc.workflow_state in ["Pending", "Rejected"]:
+            if user in [doc.employee, doc.owner] or "Leave Proxy Submitter" in roles or "HR Employee" in roles or is_admin:
+                can_apply = True
+        if not can_apply:
+            frappe.throw(_("Access Denied or invalid workflow transition."))
 
         doc.workflow_state = "Applied"
         doc.status = "Pending"
