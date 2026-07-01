@@ -55,6 +55,79 @@ def _get_level_name(level_number):
     return f"المستوى {level_number}"
 
 
+def _get_department_mapped_levels(department):
+    """Return sorted unique approval levels configured for a department."""
+    settings = _get_settings()
+    levels = {
+        row.approval_level
+        for row in (settings.approver_mappings or [])
+        if row.department == department and row.approval_level
+    }
+    return sorted(levels)
+
+
+def _get_next_required_approval_level(department, current_level, max_required_level):
+    """
+    Return the next actionable approval level for a leave in a department.
+
+    This allows gaps in global level sequence for specific departments,
+    e.g. a department can move from level 1 directly to level 3 when
+    level 2 is not mapped for that department.
+    """
+    current_level = current_level or 0
+    max_required_level = max_required_level or 1
+
+    if current_level >= max_required_level:
+        return None
+
+    mapped_levels = _get_department_mapped_levels(department)
+    next_mapped = [lvl for lvl in mapped_levels if current_level < lvl <= max_required_level]
+    if next_mapped:
+        return next_mapped[0]
+
+    # If no mapped level exists in the bounded range, jump to the next mapped
+    # level after current (supports departments that intentionally skip levels).
+    next_after_current = [lvl for lvl in mapped_levels if lvl > current_level]
+    if next_after_current:
+        return next_after_current[0]
+
+    return None
+
+
+def _annotate_next_approval_levels(leaves):
+    """Attach next_approval_level to each leave row for UI/status rendering."""
+    for row in leaves:
+        current_level = row.get("current_approval_level") or 0
+        max_level = row.get("max_required_level") or 1
+        row["next_approval_level"] = _get_next_required_approval_level(
+            row.get("dep"), current_level, max_level
+        )
+    return leaves
+
+
+def _resolve_employee_user(employee_value):
+    """Resolve an employee filter value to a User id when possible."""
+    if not employee_value:
+        return None
+
+    employee_value = str(employee_value).strip()
+    if not employee_value:
+        return None
+
+    user = frappe.db.get_value("Leave Employee", {"user": employee_value}, "user")
+    if user:
+        return user
+
+    user = frappe.db.get_value("Leave Employee", {"full_name": employee_value}, "user")
+    if user:
+        return user
+
+    if frappe.db.exists("User", employee_value):
+        return employee_value
+
+    return None
+
+
 def _get_user_approver_info(user):
     """
     Return a list of dicts: [{department, approval_level}, ...]
@@ -135,7 +208,7 @@ LEAVE_FIELDS_FOLLOWUP = LEAVE_FIELDS + ["printed", "is_read"]
 
 
 @frappe.whitelist()
-def get_employee_leaves(from_date=None, to_date=None, leave_type=None, status=None):
+def get_employee_leaves(from_date=None, to_date=None, leave_type=None, status=None, dep=None, employee_name=None, printed=None):
     """Get leaves for the current logged-in employee"""
     user = frappe.session.user
     filters = {"employee": user}
@@ -156,11 +229,11 @@ def get_employee_leaves(from_date=None, to_date=None, leave_type=None, status=No
         order_by="modified desc",
         limit_page_length=100,
     )
-    return leaves
+    return _annotate_next_approval_levels(leaves)
 
 
 @frappe.whitelist()
-def get_pending_approval_leaves(from_date=None, to_date=None, leave_type=None, status=None):
+def get_pending_approval_leaves(from_date=None, to_date=None, leave_type=None, status=None, dep=None, employee_name=None, printed=None):
     """
     Get leaves awaiting approval from the current user.
     Uses the Leave Approver Mapping to determine which departments/levels this user approves.
@@ -174,9 +247,6 @@ def get_pending_approval_leaves(from_date=None, to_date=None, leave_type=None, s
     if not approver_info and not is_admin:
         return []
 
-    # Build OR conditions: for each mapping, find leaves in that department
-    # where current_approval_level + 1 == mapping.approval_level
-    or_conditions = []
     dept_level_map = {}  # {department: [levels]}
 
     if is_admin and not approver_info:
@@ -194,13 +264,21 @@ def get_pending_approval_leaves(from_date=None, to_date=None, leave_type=None, s
         if leave_type:
             all_filters["leave_type"] = leave_type
 
-        return frappe.get_all(
+        if employee_name:
+            resolved_user = _resolve_employee_user(employee_name)
+            if resolved_user:
+                all_filters["employee"] = resolved_user
+            else:
+                all_filters["employee_fullname"] = employee_name
+
+        leaves = frappe.get_all(
             "Leave",
             filters=all_filters,
             fields=LEAVE_FIELDS,
             order_by="modified desc",
             limit_page_length=200,
         )
+        return _annotate_next_approval_levels(leaves)
 
     for info in approver_info:
         dept = info["department"]
@@ -212,56 +290,50 @@ def get_pending_approval_leaves(from_date=None, to_date=None, leave_type=None, s
     if not dept_level_map:
         return []
 
-    # Build SQL conditions for each department/level combo
-    conditions_parts = []
-    params = []
-
-    for dept, levels in dept_level_map.items():
-        for level in levels:
-            # The leave needs approval at this level if current_approval_level == level - 1
-            # and the leave is not yet fully approved or rejected
-            conditions_parts.append(
-                "(`tabLeave`.dep = %s AND `tabLeave`.current_approval_level = %s)"
-            )
-            params.extend([dept, level - 1])
-
-    if not conditions_parts:
-        return []
-
-    dept_condition = "(" + " OR ".join(conditions_parts) + ")"
+    # Base filters for candidate leaves in departments this user can approve.
+    filters = {"dep": ["in", list(dept_level_map.keys())]}
 
     # Status filtering
     if status and status != "All":
-        status_condition = " AND `tabLeave`.workflow_state = %s"
-        params.append(status)
+        filters["workflow_state"] = status
     else:
-        status_condition = " AND `tabLeave`.workflow_state IN ('Applied', 'Approved By Department')"
+        filters["workflow_state"] = ["in", ["Applied", "Approved By Department"]]
 
     # Date and leave type filtering
-    extra_conditions = ""
     if from_date:
-        extra_conditions += " AND `tabLeave`.from_date >= %s"
-        params.append(from_date)
+        filters["from_date"] = [">=", from_date]
     if to_date:
-        extra_conditions += " AND `tabLeave`.to_date <= %s"
-        params.append(to_date)
+        filters["to_date"] = ["<=", to_date]
     if leave_type:
-        extra_conditions += " AND `tabLeave`.leave_type = %s"
-        params.append(leave_type)
+        filters["leave_type"] = leave_type
 
-    fields_str = ", ".join([f"`tabLeave`.{f}" for f in LEAVE_FIELDS])
+    resolved_user = _resolve_employee_user(employee_name) if employee_name else None
 
-    sql = f"""
-        SELECT {fields_str}
-        FROM `tabLeave`
-        WHERE {dept_condition}
-        {status_condition}
-        {extra_conditions}
-        ORDER BY `tabLeave`.modified DESC
-        LIMIT 200
-    """
+    candidate_leaves = frappe.get_all(
+        "Leave",
+        filters=filters,
+        fields=LEAVE_FIELDS,
+        order_by="modified desc",
+        limit_page_length=500,
+    )
 
-    leaves = frappe.db.sql(sql, params, as_dict=True)
+    leaves = []
+    for leave in candidate_leaves:
+        if employee_name:
+            if resolved_user and leave.employee != resolved_user:
+                continue
+            if not resolved_user and leave.employee_fullname != employee_name:
+                continue
+
+        dept_levels = dept_level_map.get(leave.dep, [])
+        next_level = _get_next_required_approval_level(
+            leave.dep,
+            leave.current_approval_level or 0,
+            leave.max_required_level or 1,
+        )
+        if next_level and next_level in dept_levels:
+            leave["next_approval_level"] = next_level
+            leaves.append(leave)
 
     # If admin, also add leaves they haven't already covered
     if is_admin:
@@ -278,7 +350,7 @@ def get_pending_approval_leaves(from_date=None, to_date=None, leave_type=None, s
             if al.name not in existing_names:
                 leaves.append(al)
 
-    return leaves
+    return _annotate_next_approval_levels(leaves)
 
 
 @frappe.whitelist()
@@ -326,7 +398,11 @@ def get_all_leaves(from_date=None, to_date=None, leave_type=None, status=None, d
         else:
             filters["dep"] = dep
     if employee_name:
-        filters["employee"] = employee_name
+        resolved_user = _resolve_employee_user(employee_name)
+        if resolved_user:
+            filters["employee"] = resolved_user
+        else:
+            filters["employee_fullname"] = employee_name
 
     if printed == "Printed":
         filters["printed"] = 1
@@ -349,11 +425,11 @@ def get_all_leaves(from_date=None, to_date=None, leave_type=None, status=None, d
             order_by="modified desc",
             limit_page_length=500,
         )
-    return leaves
+    return _annotate_next_approval_levels(leaves)
 
 
 @frappe.whitelist()
-def get_proxy_leaves(from_date=None, to_date=None, leave_type=None, status=None):
+def get_proxy_leaves(from_date=None, to_date=None, leave_type=None, status=None, dep=None, employee_name=None, printed=None):
     """Get leaves submitted by the current user on behalf of others"""
     user = frappe.session.user
     roles = frappe.get_roles(user)
@@ -378,7 +454,7 @@ def get_proxy_leaves(from_date=None, to_date=None, leave_type=None, status=None)
         order_by="modified desc",
         limit_page_length=100,
     )
-    return leaves
+    return _annotate_next_approval_levels(leaves)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -435,8 +511,15 @@ def apply_workflow_action(leave_name, action, comment=None):
     if action not in ["Approve", "Reject"]:
         frappe.throw(_("Invalid action"))
 
-    # Determine the next required level
-    next_level = (doc.current_approval_level or 0) + 1
+    # Determine the next actionable level for this department.
+    next_level = _get_next_required_approval_level(
+        doc.dep,
+        doc.current_approval_level or 0,
+        doc.max_required_level or 1,
+    )
+
+    if not next_level:
+        frappe.throw(_("No further approval level is available for this request."))
 
     # Check if user is authorized to approve at the next level for this department
     if not is_admin:
@@ -467,7 +550,13 @@ def apply_workflow_action(leave_name, action, comment=None):
 
         _append_action_log(doc, f"موافقة المستوى {next_level} ({_get_level_name(next_level)})", user)
 
-        if next_level >= (doc.max_required_level or 1):
+        upcoming_level = _get_next_required_approval_level(
+            doc.dep,
+            doc.current_approval_level or 0,
+            doc.max_required_level or 1,
+        )
+
+        if not upcoming_level or doc.current_approval_level >= (doc.max_required_level or 1):
             # Final approval
             doc.workflow_state = "Approved"
             doc.status = "Approved"
@@ -537,7 +626,7 @@ def get_departments():
 
 @frappe.whitelist()
 def get_leave_employees():
-    """Get all employees, filtered by visible departments if applicable."""
+    """Get employees filtered by role scope and department visibility."""
     user = frappe.session.user
     roles = frappe.get_roles(user)
     filters = {}
@@ -545,12 +634,42 @@ def get_leave_employees():
     settings = _get_settings()
     hr_role = settings.hr_employee_role or "HR Employee"
 
-    if "System Manager" not in roles and (hr_role in roles or "Follow Up Employee" in roles):
-        visible_depts = _get_user_visible_departments(user)
-        if visible_depts:
-            filters["leave_department"] = ["in", visible_depts]
+    if "System Manager" in roles:
+        return frappe.get_all("Leave Employee", filters=filters, fields=["name", "user", "full_name"], limit_page_length=0)
 
-    return frappe.get_all("Leave Employee", filters=filters, fields=["name", "full_name"], limit_page_length=0)
+    # Top approval role (highest configured level) can see all employees.
+    approval_levels = _get_approval_levels()
+    highest_level = max([lvl.level for lvl in approval_levels], default=0)
+    top_approver_roles = {
+        lvl.role for lvl in approval_levels
+        if lvl.level == highest_level and lvl.role
+    }
+    if top_approver_roles.intersection(set(roles)):
+        return frappe.get_all("Leave Employee", filters=filters, fields=["name", "user", "full_name"], limit_page_length=0)
+
+    allowed_departments = None
+
+    # Department approvers are limited to departments from approver mappings.
+    approver_info = _get_user_approver_info(user)
+    if approver_info:
+        approver_departments = {row.get("department") for row in approver_info if row.get("department")}
+        allowed_departments = approver_departments
+
+    # Follow Up / HR visibility is applied as an additional restriction when configured.
+    if hr_role in roles or "Follow Up Employee" in roles:
+        visible_depts = set(_get_user_visible_departments(user) or [])
+        if visible_depts:
+            if allowed_departments is None:
+                allowed_departments = visible_depts
+            else:
+                allowed_departments = allowed_departments.intersection(visible_depts)
+
+    if allowed_departments is not None:
+        if not allowed_departments:
+            return []
+        filters["leave_department"] = ["in", sorted(allowed_departments)]
+
+    return frappe.get_all("Leave Employee", filters=filters, fields=["name", "user", "full_name"], limit_page_length=0)
 
 
 def ensure_proxy_role_exists():

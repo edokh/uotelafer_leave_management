@@ -424,7 +424,7 @@ class LeaveManagementPage {
 		let emp_name = '';
 		if (emp_val) {
 			let matched = this.leave_employees ? this.leave_employees.find(d => (d.full_name || d.name) === emp_val) : null;
-			emp_name = matched ? matched.name : emp_val;
+			emp_name = matched ? (matched.user || matched.name) : emp_val;
 		}
 
 		return {
@@ -520,19 +520,19 @@ class LeaveManagementPage {
 		let cls = '';
 		let label = state;
 		let current_level = row.current_approval_level || 0;
-		let max_level = row.max_required_level || 1;
+		let next_level = row.next_approval_level;
 
 		if (state === 'Pending') {
 			cls = 'pending';
 			label = 'قيد الإنتظار';
 		} else if (state === 'Applied') {
 			cls = 'applied';
-			let next_level = 1;
+			next_level = next_level || 1;
 			let level_name = this.approval_level_names[next_level] || `المستوى ${next_level}`;
 			label = `بانتظار ${level_name}`;
 		} else if (state === 'Approved By Department') {
 			cls = 'approved-dept';
-			let next_level = current_level + 1;
+			next_level = next_level || (current_level + 1);
 			let level_name = this.approval_level_names[next_level] || `المستوى ${next_level}`;
 			label = `بانتظار ${level_name}`;
 		} else if (state === 'Approved') {
