@@ -637,6 +637,11 @@ def get_leave_employees():
     if "System Manager" in roles:
         return frappe.get_all("Leave Employee", filters=filters, fields=["name", "user", "full_name"], limit_page_length=0)
 
+    # University President should always see all employees.
+    # Keep both spellings for backward compatibility with existing role data.
+    if "University President" in roles or "University Presedent" in roles:
+        return frappe.get_all("Leave Employee", filters=filters, fields=["name", "user", "full_name"], limit_page_length=0)
+
     # Top approval role (highest configured level) can see all employees.
     approval_levels = _get_approval_levels()
     highest_level = max([lvl.level for lvl in approval_levels], default=0)
