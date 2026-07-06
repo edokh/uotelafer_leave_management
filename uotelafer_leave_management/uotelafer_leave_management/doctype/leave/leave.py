@@ -379,6 +379,16 @@ def get_leave_balance(employee, leave_type, current_leave_name=None):
     if not employee or not leave_type:
         return {'total_balance': 0, 'applications': []}
 
+    # For cancellation requests, balance should be computed against the
+    # original leave type (not the synthetic "إلغاء إجازة" type).
+    effective_leave_type = leave_type
+    if leave_type == "إلغاء إجازة" and current_leave_name:
+        original_leave_name = frappe.db.get_value("Leave", current_leave_name, "original_leave")
+        if original_leave_name:
+            original_type = frappe.db.get_value("Leave", original_leave_name, "leave_type")
+            if original_type:
+                effective_leave_type = original_type
+
     user = frappe.session.user
     roles = frappe.get_roles(user)
 
@@ -411,7 +421,7 @@ def get_leave_balance(employee, leave_type, current_leave_name=None):
         "Leave Balance Transaction",
         filters={
             "employee": employee,
-            "leave_type": leave_type
+            "leave_type": effective_leave_type
         },
         fields=["transaction_type", "balance"]
     )
@@ -426,7 +436,7 @@ def get_leave_balance(employee, leave_type, current_leave_name=None):
     # Get all leave applications for this employee and leave type
     filters = {
         "employee": employee,
-        "leave_type": leave_type,
+        "leave_type": effective_leave_type,
         "docstatus": 0,
     }
 
@@ -450,7 +460,11 @@ def get_leave_balance(employee, leave_type, current_leave_name=None):
                 taken_days += application.get("days", 0)
 
     total_balance -= taken_days
-    return {'total_balance': total_balance, 'applications': leave_applications}
+    return {
+        'total_balance': total_balance,
+        'applications': leave_applications,
+        'effective_leave_type': effective_leave_type,
+    }
 
 @frappe.whitelist()
 def calculate_leave_days(from_date, to_date):

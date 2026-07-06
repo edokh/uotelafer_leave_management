@@ -1023,6 +1023,7 @@ class LeaveManagementPage {
 				args: { employee: row.employee, leave_type: row.leave_type, current_leave_name: row.name }
 			});
 			let balance_before = balance_r.message ? balance_r.message.total_balance : 0;
+			let effective_leave_type = (balance_r.message && balance_r.message.effective_leave_type) || row.leave_type;
 			let days_to_deduct = row.is_time_leave ? (row.number_of_hours / 7.0) : row.days;
 			if (row.leave_type === 'إلغاء إجازة') {
 				days_to_deduct = -days_to_deduct;
@@ -1031,7 +1032,7 @@ class LeaveManagementPage {
 
 			balance_html = `
 				<div class="lm-detail-item full-width" style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-					<div class="detail-label" style="color: #166534; margin-bottom: 10px; font-weight: bold; text-align: center; border-bottom: 1px solid #bbf7d0; padding-bottom: 5px;">تأثير الإجازة على الرصيد (${row.leave_type})</div>
+					<div class="detail-label" style="color: #166534; margin-bottom: 10px; font-weight: bold; text-align: center; border-bottom: 1px solid #bbf7d0; padding-bottom: 5px;">تأثير الإجازة على الرصيد (${effective_leave_type})</div>
 					<div style="display: flex; justify-content: space-around; text-align: center;">
 						<div>
 							<div style="font-size: 13px; color: #15803d; margin-bottom: 5px;">الرصيد قبل الموافقة</div>
