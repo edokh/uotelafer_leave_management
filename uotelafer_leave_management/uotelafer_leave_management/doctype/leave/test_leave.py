@@ -351,8 +351,12 @@ class TestLeave(FrappeTestCase):
 		
 		# Run workflow action
 		apply_workflow_action(leave.name, "Apply")
-		apply_workflow_action(leave.name, "Approve") # Applied -> Approved By Department
-		apply_workflow_action(leave.name, "Approve") # Approved By Department -> Approved
+		leave.reload()
+		for _ in range((leave.max_required_level or 1) + 1):
+			if leave.workflow_state == "Approved":
+				break
+			apply_workflow_action(leave.name, "Approve")
+			leave.reload()
 
 		# Reload document and verify
 		leave.reload()
@@ -361,3 +365,180 @@ class TestLeave(FrappeTestCase):
 		self.assertEqual(leave.approved_by_name, frappe.db.get_value("User", "Administrator", "full_name"))
 		self.assertEqual(leave.approved_by_email, frappe.db.get_value("User", "Administrator", "email"))
 		self.assertIsNotNone(leave.approved_on)
+
+	def test_formation_level_routing_uses_sibling_department_mappings(self):
+		"""A leave should advance to the next formation level before final approval."""
+		from uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment import apply_workflow_action
+
+		if not frappe.db.exists("Leave Department", "Sibling Dept"):
+			frappe.get_doc({
+				"doctype": "Leave Department",
+				"department_name": "Sibling Dept",
+				"formation": "Test Formation",
+				"department_head": "Administrator"
+			}).insert(ignore_permissions=True)
+
+		settings = frappe.get_doc("Leave Settings")
+		original_levels = [
+			{
+				"level": row.level,
+				"level_name": row.level_name,
+				"min_days": row.min_days,
+				"max_days": row.max_days,
+				"role": row.role,
+			}
+			for row in (settings.approval_levels or [])
+		]
+		original_mappings = [
+			{
+				"user": row.user,
+				"department": row.department,
+				"approval_level": row.approval_level,
+			}
+			for row in (settings.approver_mappings or [])
+		]
+
+		try:
+			settings.set("approval_levels", [])
+			settings.append("approval_levels", {
+				"level": 1,
+				"level_name": "Supervisor",
+				"min_days": 0,
+				"max_days": 3,
+				"role": "System Manager",
+			})
+			settings.append("approval_levels", {
+				"level": 2,
+				"level_name": "President",
+				"min_days": 4,
+				"max_days": 0,
+				"role": "System Manager",
+			})
+
+			settings.set("approver_mappings", [])
+			settings.append("approver_mappings", {
+				"user": "Administrator",
+				"department": "Test Dept",
+				"approval_level": 1,
+			})
+			settings.append("approver_mappings", {
+				"user": "Administrator",
+				"department": "Sibling Dept",
+				"approval_level": 2,
+			})
+			settings.save(ignore_permissions=True)
+
+			leave = frappe.get_doc({
+				"doctype": "Leave",
+				"employee": "Administrator",
+				"leave_type": "اجازة اعتيادية",
+				"from_date": "2026-07-10",
+				"to_date": "2026-07-14",
+				"dep": "Test Dept",
+				"reason": "Formation routing test"
+			})
+			self.insert_doc_without_workflow(leave)
+			leave.workflow_state = "Pending"
+			leave.save(ignore_permissions=True)
+
+			frappe.set_user("Administrator")
+			apply_workflow_action(leave.name, "Apply")
+			apply_workflow_action(leave.name, "Approve")
+
+			leave.reload()
+			self.assertEqual(leave.workflow_state, "Approved By Department")
+			self.assertEqual(leave.current_approval_level, 1)
+
+			apply_workflow_action(leave.name, "Approve")
+
+			leave.reload()
+			self.assertEqual(leave.workflow_state, "Approved")
+			self.assertEqual(leave.current_approval_level, 2)
+		finally:
+			settings.reload()
+			settings.set("approval_levels", [])
+			for row in original_levels:
+				settings.append("approval_levels", row)
+			settings.set("approver_mappings", [])
+			for row in original_mappings:
+				settings.append("approver_mappings", row)
+			settings.save(ignore_permissions=True)
+
+	def test_final_approval_without_next_level_keeps_workflow_valid(self):
+		"""If no next level exists, approval should still finalize without invalid transition errors."""
+		from uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment import apply_workflow_action
+
+		settings = frappe.get_doc("Leave Settings")
+		original_levels = [
+			{
+				"level": row.level,
+				"level_name": row.level_name,
+				"min_days": row.min_days,
+				"max_days": row.max_days,
+				"role": row.role,
+			}
+			for row in (settings.approval_levels or [])
+		]
+		original_mappings = [
+			{
+				"user": row.user,
+				"department": row.department,
+				"approval_level": row.approval_level,
+			}
+			for row in (settings.approver_mappings or [])
+		]
+
+		try:
+			settings.set("approval_levels", [])
+			settings.append("approval_levels", {
+				"level": 1,
+				"level_name": "Supervisor",
+				"min_days": 0,
+				"max_days": 3,
+				"role": "System Manager",
+			})
+			settings.append("approval_levels", {
+				"level": 2,
+				"level_name": "President",
+				"min_days": 4,
+				"max_days": 0,
+				"role": "System Manager",
+			})
+
+			settings.set("approver_mappings", [])
+			settings.append("approver_mappings", {
+				"user": "Administrator",
+				"department": "Test Dept",
+				"approval_level": 1,
+			})
+			settings.save(ignore_permissions=True)
+
+			leave = frappe.get_doc({
+				"doctype": "Leave",
+				"employee": "Administrator",
+				"leave_type": "اجازة اعتيادية",
+				"from_date": "2026-07-20",
+				"to_date": "2026-07-25",
+				"dep": "Test Dept",
+				"reason": "No-next-level finalization test"
+			})
+			self.insert_doc_without_workflow(leave)
+			leave.workflow_state = "Pending"
+			leave.save(ignore_permissions=True)
+
+			frappe.set_user("Administrator")
+			apply_workflow_action(leave.name, "Apply")
+			apply_workflow_action(leave.name, "Approve")
+
+			leave.reload()
+			self.assertEqual(leave.workflow_state, "Approved")
+			self.assertEqual(leave.current_approval_level, 1)
+		finally:
+			settings.reload()
+			settings.set("approval_levels", [])
+			for row in original_levels:
+				settings.append("approval_levels", row)
+			settings.set("approver_mappings", [])
+			for row in original_mappings:
+				settings.append("approver_mappings", row)
+			settings.save(ignore_permissions=True)

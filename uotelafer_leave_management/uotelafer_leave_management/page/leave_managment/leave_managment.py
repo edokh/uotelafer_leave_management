@@ -55,6 +55,30 @@ def _get_level_name(level_number):
     return f"المستوى {level_number}"
 
 
+def _get_department_formation(department):
+    """Return the formation assigned to a department, if any."""
+    if not department:
+        return None
+    return frappe.db.get_value("Leave Department", department, "formation")
+
+
+def _get_scope_departments_for_approval(department):
+    """Return the departments that share the approval path for a leave department."""
+    if not department:
+        return []
+
+    formation = _get_department_formation(department)
+    if not formation:
+        return [department]
+
+    departments = frappe.get_all(
+        "Leave Department",
+        filters={"formation": formation},
+        pluck="name",
+    )
+    return departments or [department]
+
+
 def _get_department_mapped_levels(department):
     """Return sorted unique approval levels configured for a department."""
     settings = _get_settings()
@@ -62,6 +86,21 @@ def _get_department_mapped_levels(department):
         row.approval_level
         for row in (settings.approver_mappings or [])
         if row.department == department and row.approval_level
+    }
+    return sorted(levels)
+
+
+def _get_scope_mapped_levels(department):
+    """Return approval levels available to a department's whole approval scope."""
+    scope_departments = set(_get_scope_departments_for_approval(department))
+    if not scope_departments:
+        return []
+
+    settings = _get_settings()
+    levels = {
+        row.approval_level
+        for row in (settings.approver_mappings or [])
+        if row.department in scope_departments and row.approval_level
     }
     return sorted(levels)
 
@@ -80,7 +119,10 @@ def _get_next_required_approval_level(department, current_level, max_required_le
     if current_level >= max_required_level:
         return None
 
-    mapped_levels = _get_department_mapped_levels(department)
+    mapped_levels = _get_scope_mapped_levels(department)
+    if not mapped_levels:
+        return current_level + 1 if current_level < max_required_level else None
+
     next_mapped = [lvl for lvl in mapped_levels if current_level < lvl <= max_required_level]
     if next_mapped:
         return next_mapped[0]
@@ -92,6 +134,32 @@ def _get_next_required_approval_level(department, current_level, max_required_le
         return next_after_current[0]
 
     return None
+
+
+def _is_same_approval_scope(source_department, target_department):
+    """Check whether two departments share the same approval scope."""
+    if not source_department or not target_department:
+        return False
+    if source_department == target_department:
+        return True
+
+    source_formation = _get_department_formation(source_department)
+    target_formation = _get_department_formation(target_department)
+    return bool(source_formation and source_formation == target_formation)
+
+
+def _user_can_approve_level_for_department(user, department, approval_level):
+    """Return True when the user can approve the target level for the leave department."""
+    if not user or not department or not approval_level:
+        return False
+
+    for info in _get_user_approver_info(user):
+        if info.get("approval_level") != approval_level:
+            continue
+        if _is_same_approval_scope(info.get("department"), department):
+            return True
+
+    return False
 
 
 def _annotate_next_approval_levels(leaves):
@@ -247,7 +315,7 @@ def get_pending_approval_leaves(from_date=None, to_date=None, leave_type=None, s
     if not approver_info and not is_admin:
         return []
 
-    dept_level_map = {}  # {department: [levels]}
+    dept_level_map = {}  # {department in approval scope: {levels}}
 
     if is_admin and not approver_info:
         # Admin sees all pending leaves
@@ -283,9 +351,10 @@ def get_pending_approval_leaves(from_date=None, to_date=None, leave_type=None, s
     for info in approver_info:
         dept = info["department"]
         level = info["approval_level"]
-        if dept not in dept_level_map:
-            dept_level_map[dept] = []
-        dept_level_map[dept].append(level)
+        for scoped_dept in _get_scope_departments_for_approval(dept):
+            if scoped_dept not in dept_level_map:
+                dept_level_map[scoped_dept] = set()
+            dept_level_map[scoped_dept].add(level)
 
     if not dept_level_map:
         return []
@@ -325,7 +394,7 @@ def get_pending_approval_leaves(from_date=None, to_date=None, leave_type=None, s
             if not resolved_user and leave.employee_fullname != employee_name:
                 continue
 
-        dept_levels = dept_level_map.get(leave.dep, [])
+        dept_levels = dept_level_map.get(leave.dep, set())
         next_level = _get_next_required_approval_level(
             leave.dep,
             leave.current_approval_level or 0,
@@ -523,13 +592,7 @@ def apply_workflow_action(leave_name, action, comment=None):
 
     # Check if user is authorized to approve at the next level for this department
     if not is_admin:
-        approver_info = _get_user_approver_info(user)
-        authorized = False
-        for info in approver_info:
-            if info["department"] == doc.dep and info["approval_level"] == next_level:
-                authorized = True
-                break
-        if not authorized:
+        if not _user_can_approve_level_for_department(user, doc.dep, next_level):
             frappe.throw(_("Access Denied: You are not authorized to approve at level {0} for department {1}.").format(
                 next_level, doc.dep
             ))
@@ -558,6 +621,17 @@ def apply_workflow_action(leave_name, action, comment=None):
 
         if not upcoming_level or doc.current_approval_level >= (doc.max_required_level or 1):
             # Final approval
+            # When workflow requires an intermediate state for multi-level requests,
+            # pass through it internally before final approval to keep transitions valid.
+            if doc.workflow_state == "Applied" and (doc.max_required_level or 1) > 1:
+                doc.workflow_state = "Approved By Department"
+                doc.status = "Pending"
+                if not doc.date_of_supervisor_action:
+                    doc.date_of_supervisor_action = frappe.utils.today()
+                doc.flags.ignore_permissions = True
+                doc.flags.ignore_workflow_validation = True
+                doc.save(ignore_permissions=True)
+
             doc.workflow_state = "Approved"
             doc.status = "Approved"
             doc.approved_by = user
