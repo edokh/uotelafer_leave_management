@@ -68,25 +68,26 @@ class LeaveSettings(Document):
 		page.save(ignore_permissions=True)
 
 	def update_citizen_affairs_page_roles(self):
-		"""Sync roles to the Citizens Affairs Management page."""
+		"""Sync roles to the Citizens Affairs Management page based on Leave Settings."""
 		if not frappe.db.exists("Page", "citizens-affairs-mgm"):
 			return
 
 		page = frappe.get_doc("Page", "citizens-affairs-mgm")
 
-		roles = ["System Manager", "Citizen Affairs Manager"]
+		roles = ["System Manager"]
 
-		# Add all approval-level roles (they may need access to citizen affairs)
+		# Add the citizens affairs admin role defined in Leave Settings
+		if self.citizens_affairs_admin_role and self.citizens_affairs_admin_role not in roles:
+			roles.append(self.citizens_affairs_admin_role)
+
+		# Add all approval-level roles (in case leave approvers also handle citizen requests)
 		for level in self.approval_levels or []:
 			if level.role and level.role not in roles:
 				roles.append(level.role)
-
-		# Add the citizens affairs admin role
-		if self.citizens_affairs_admin_role and self.citizens_affairs_admin_role not in roles:
-			roles.append(self.citizens_affairs_admin_role)
 
 		page.roles = []
 		for role in roles:
 			page.append("roles", {"role": role})
 
 		page.save(ignore_permissions=True)
+

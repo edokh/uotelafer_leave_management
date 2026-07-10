@@ -1,10 +1,11 @@
 /* ===== Citizens Affairs Management – Premium RTL Arabic UI ===== */
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap');
 
-.ca-mgm-page {
-    direction: rtl;
-    text-align: right;
-    font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+.ca-mgm-page,
+.ca-mgm-container {
+    direction: rtl !important;
+    text-align: right !important;
+    font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif !important;
     max-width: 1300px;
     margin: 0 auto;
     padding: 10px 20px 40px;
@@ -104,82 +105,119 @@
     color: #fff;
 }
 
-/* ===== Filters ===== */
-.ca-mgm-filters {
+/* ===== Filters Bar ===== */
+.ca-mgm-filter-bar {
+    background: var(--card-bg, #ffffff);
+    border: 1.5px solid var(--border-color, #e2e8f0);
+    border-radius: 18px;
+    padding: 22px 26px;
+    margin-bottom: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    transition: box-shadow 0.25s ease;
+}
+.ca-mgm-filter-bar:hover {
+    box-shadow: 0 6px 28px rgba(0, 0, 0, 0.06);
+}
+.ca-mgm-filter-header {
     display: flex;
-    gap: 14px;
-    margin-bottom: 20px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px dashed var(--border-color, #e2e8f0);
+}
+.filter-header-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--text-color, #1e293b);
+}
+.ca-mgm-filters-grid {
+    display: flex;
     flex-wrap: wrap;
+    gap: 18px;
     align-items: flex-end;
 }
 .ca-mgm-filter-group {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 7px;
+    flex: 1;
+    min-width: 190px;
 }
 .ca-mgm-filter-group label {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 700;
-    color: var(--text-muted);
-}
-.ca-mgm-filter-group input,
-.ca-mgm-filter-group select {
-    padding: 6px 10px;
-    border: 1.5px solid var(--border-color);
-    border-radius: 8px;
-    font-size: 13px;
-    font-family: inherit;
-    background: var(--control-bg);
-    color: var(--text-color);
-    min-width: 150px;
-    height: 36px;
-    box-sizing: border-box;
-    transition: border-color .2s, box-shadow .2s;
-}
-.ca-mgm-filter-group input:focus,
-.ca-mgm-filter-group select:focus {
-    outline: none;
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37,99,235,.12);
-}
-.ca-mgm-filter-clear {
-    padding: 6px 16px;
-    height: 36px;
-    border: 1.5px solid var(--border-color);
-    border-radius: 8px;
-    background: var(--control-bg);
-    color: var(--text-muted);
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-    transition: background .2s;
-}
-.ca-mgm-filter-clear:hover {
-    background: var(--bg-light-gray);
-}
-.ca-mgm-filters-header-mobile {
-    display: none;
-}
-.ca-mgm-filter-toggle {
+    color: var(--text-muted, #64748b);
     display: flex;
     align-items: center;
-    gap: 8px;
-    background: var(--bg-light-gray);
-    color: var(--text-color);
-    border: 1.5px solid var(--border-color);
-    border-radius: 10px;
-    padding: 10px 16px;
+    gap: 4px;
+}
+.ca-filter-control {
+    height: 44px;
+    padding: 8px 14px;
+    border: 1.5px solid var(--border-color, #cbd5e1);
+    border-radius: 12px;
+    background: var(--control-bg, #f8fafc);
+    color: var(--text-color, #1e293b);
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    direction: rtl;
+    text-align: right;
+    box-sizing: border-box;
+    width: 100%;
+}
+.ca-filter-control:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #ffffff;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.14);
+}
+.ca-mgm-filter-actions {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-shrink: 0;
+}
+.ca-mgm-btn {
+    height: 44px;
+    padding: 0 22px;
+    border-radius: 12px;
     font-size: 14px;
     font-weight: 700;
-    cursor: pointer;
     font-family: inherit;
-    width: 100%;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
-    transition: background .2s;
+    gap: 8px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+    white-space: nowrap;
 }
-.ca-mgm-filter-toggle:hover {
-    background: rgba(37,99,235,.08);
+.ca-btn-primary {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: #ffffff !important;
+    box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+}
+.ca-btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(37, 99, 235, 0.45);
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+}
+.ca-btn-outline {
+    background: var(--control-bg, #f8fafc);
+    color: var(--text-color, #334155) !important;
+    border: 1.5px solid var(--border-color, #cbd5e1);
+}
+.ca-btn-outline:hover {
+    background: var(--bg-light-gray, #f1f5f9);
+    border-color: #94a3b8;
+    transform: translateY(-2px);
 }
 
 /* ===== Stats ===== */
@@ -444,25 +482,27 @@
     .ca-mgm-header h1 { font-size: 24px; text-align: center; }
     .ca-mgm-copy-link-btn { width: 100%; justify-content: center; }
 
-    .ca-mgm-filters-header-mobile {
-        display: block;
-        margin-bottom: 12px;
+    .ca-mgm-filters-grid {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 14px;
     }
-    #ca-filters-content {
-        display: none;
-    }
-    .ca-mgm-filters {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-        align-items: end;
-    }
-    .ca-mgm-filter-group { width: 100%; }
-    .ca-mgm-filter-group input, .ca-mgm-filter-group select {
+    .ca-mgm-filter-group {
         width: 100%;
         min-width: 100%;
     }
-    .ca-mgm-filter-clear { width: 100%; }
+    .ca-filter-control {
+        width: 100%;
+    }
+    .ca-mgm-filter-actions {
+        flex-direction: column;
+        width: 100%;
+        gap: 10px;
+    }
+    .ca-mgm-btn {
+        width: 100%;
+        justify-content: center;
+    }
 
     .ca-mgm-detail-grid { grid-template-columns: 1fr; }
     .ca-mgm-stat-card { min-width: 100px; }

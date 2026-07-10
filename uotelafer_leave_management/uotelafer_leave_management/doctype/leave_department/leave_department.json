@@ -11,7 +11,8 @@
   "formation",
   "department_head",
   "department_head_name",
-  "department_head_personal_email"
+  "department_head_personal_email",
+  "accept_citzen_requests"
  ],
  "fields": [
   {
@@ -45,11 +46,17 @@
    "fieldname": "department_head_personal_email",
    "fieldtype": "Data",
    "label": "Department Head Personal Email"
+  },
+  {
+   "default": "0",
+   "fieldname": "accept_citzen_requests",
+   "fieldtype": "Check",
+   "label": "Accept Citzen Requests"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-25 11:39:00.000000",
+ "modified": "2026-07-10 15:36:58.918085",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave Department",

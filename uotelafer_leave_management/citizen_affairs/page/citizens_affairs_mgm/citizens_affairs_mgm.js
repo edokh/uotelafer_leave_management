@@ -8,11 +8,23 @@ frappe.pages["citizens-affairs-mgm"].on_page_load = function (wrapper) {
 class CitizensAffairsManagement {
 	constructor(wrapper) {
 		this.wrapper = $(wrapper);
+		this.wrapper.addClass("ca-mgm-page rtl").attr("dir", "rtl");
 		this.page = frappe.ui.make_app_page({
 			parent: wrapper,
 			title: __("إدارة شؤون المواطنين"),
 			single_column: true
 		});
+
+		if (this.page && this.page.wrapper) {
+			this.page.wrapper.attr("dir", "rtl").addClass("ca-mgm-page");
+			this.page.wrapper.find(".page-head").attr("dir", "rtl").css({
+				direction: "rtl",
+				"text-align": "right"
+			});
+		}
+		if (this.page && this.page.main) {
+			this.page.main.attr("dir", "rtl").addClass("ca-mgm-page");
+		}
 
 		this.user_role_info = null;
 		this.current_tab = "my_department"; // 'my_department' | 'all_requests'
@@ -43,7 +55,7 @@ class CitizensAffairsManagement {
 
 			if (!this.user_role_info.is_dept_head && !this.user_role_info.is_admin) {
 				this.page.main.html(`
-					<div class="ca-mgm-empty">
+					<div class="ca-mgm-empty" dir="rtl">
 						<div class="empty-icon">🔒</div>
 						<h3>غير مصرح لك بالوصول</h3>
 						<p>هذه الصفحة مخصصة لمدراء الكليات والأقسام ومسؤولي شعبة شؤون المواطنين فقط.</p>
@@ -63,7 +75,7 @@ class CitizensAffairsManagement {
 
 	make_ui() {
 		this.page.main.html(`
-			<div class="ca-mgm-container">
+			<div class="ca-mgm-container" dir="rtl">
 				<!-- Tabs (Only for Admins/CA Managers) -->
 				${
 					this.user_role_info.is_admin
@@ -110,34 +122,46 @@ class CitizensAffairsManagement {
 
 				<!-- Filter Bar -->
 				<div class="ca-mgm-filter-bar">
-					<div class="filter-group" id="dept-filter-group" style="display: ${this.current_tab === 'all_requests' ? 'flex' : 'none'};">
-						<label>الجهة / الكلية:</label>
-						<select id="filter-dept">
-							<option value="">جميع الجهات</option>
-						</select>
+					<div class="ca-mgm-filter-header">
+						<div class="filter-header-title">
+							<span class="filter-icon">🔍</span>
+							<span>خيارات التصفية والفرز</span>
+						</div>
 					</div>
-					<div class="filter-group">
-						<label>الحالة:</label>
-						<select id="filter-status">
-							<option value="All">جميع الحالات</option>
-							<option value="Open">قيد الانتظار (Open)</option>
-							<option value="Accepted">مقبول (Accepted)</option>
-							<option value="Rejected">مرفوض (Rejected)</option>
-							<option value="Replied">تم الرد (Replied)</option>
-							<option value="Closed">مغلق (Closed)</option>
-						</select>
-					</div>
-					<div class="filter-group">
-						<label>من تاريخ:</label>
-						<input type="date" id="filter-from-date">
-					</div>
-					<div class="filter-group">
-						<label>إلى تاريخ:</label>
-						<input type="date" id="filter-to-date">
-					</div>
-					<div class="filter-actions">
-						<button class="ca-mgm-action-btn detail" id="btn-reset-filters">إعادة ضبط</button>
-						<button class="ca-mgm-action-btn reply" id="btn-apply-filters">تطبيق الفرز</button>
+					<div class="ca-mgm-filters-grid">
+						<div class="ca-mgm-filter-group" id="dept-filter-group" style="display: ${this.current_tab === 'all_requests' ? 'flex' : 'none'};">
+							<label for="filter-dept">🏢 الجهة / الكلية:</label>
+							<select id="filter-dept" class="ca-filter-control">
+								<option value="">جميع الجهات والكليات</option>
+							</select>
+						</div>
+						<div class="ca-mgm-filter-group">
+							<label for="filter-status">📌 حالة الطلب:</label>
+							<select id="filter-status" class="ca-filter-control">
+								<option value="All">جميع الحالات</option>
+								<option value="Open">قيد الانتظار (Open)</option>
+								<option value="Accepted">مقبول (Accepted)</option>
+								<option value="Rejected">مرفوض (Rejected)</option>
+								<option value="Replied">تم الرد (Replied)</option>
+								<option value="Closed">مغلق (Closed)</option>
+							</select>
+						</div>
+						<div class="ca-mgm-filter-group">
+							<label for="filter-from-date">📅 من تاريخ:</label>
+							<input type="date" id="filter-from-date" class="ca-filter-control">
+						</div>
+						<div class="ca-mgm-filter-group">
+							<label for="filter-to-date">📅 إلى تاريخ:</label>
+							<input type="date" id="filter-to-date" class="ca-filter-control">
+						</div>
+						<div class="ca-mgm-filter-actions">
+							<button class="ca-mgm-btn ca-btn-primary" id="btn-apply-filters">
+								<span>⚡ تطبيق الفرز</span>
+							</button>
+							<button class="ca-mgm-btn ca-btn-outline" id="btn-reset-filters">
+								<span>🔄 إعادة ضبط</span>
+							</button>
+						</div>
 					</div>
 				</div>
 
@@ -513,6 +537,7 @@ class CitizensAffairsManagement {
 			}, "btn-danger");
 		}
 
+		this.setup_rtl_dialog(d);
 		d.show();
 	}
 
@@ -579,6 +604,7 @@ class CitizensAffairsManagement {
 				});
 			}
 		});
+		this.setup_rtl_dialog(d);
 		d.show();
 	}
 
@@ -646,6 +672,7 @@ class CitizensAffairsManagement {
 				});
 			}
 		});
+		this.setup_rtl_dialog(d);
 		d.show();
 	}
 
@@ -685,6 +712,21 @@ class CitizensAffairsManagement {
 				});
 			}
 		});
+		this.setup_rtl_dialog(d);
 		d.show();
+	}
+
+	setup_rtl_dialog(d) {
+		if (d && d.$wrapper) {
+			d.$wrapper.find(".modal-content, .modal-dialog").attr("dir", "rtl").css({
+				direction: "rtl",
+				"text-align": "right",
+				"font-family": "'Cairo', 'Segoe UI', Tahoma, sans-serif"
+			});
+			d.$wrapper.find(".modal-header .close").css({
+				float: "left",
+				margin: "-1rem auto -1rem -1rem"
+			});
+		}
 	}
 }

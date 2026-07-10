@@ -105,9 +105,12 @@ def submit_citizen_request(
 	if not all([full_name, target_department, request_details, phone_number, email]):
 		frappe.throw(_("جميع الحقول المطلوبة يجب إدخالها"))
 
-	# Validate department exists
-	if not frappe.db.exists("Leave Department", target_department):
+	# Validate department exists and accepts citizen requests
+	dept_info = frappe.db.get_value("Leave Department", target_department, ["name", "accept_citzen_requests"], as_dict=True)
+	if not dept_info:
 		frappe.throw(_("الجهة المعنية غير موجودة"))
+	if not dept_info.accept_citzen_requests:
+		frappe.throw(_("هذه الجهة لا تستقبل طلبات شؤون المواطنين حالياً"))
 
 	# Validate email format
 	if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
@@ -195,10 +198,10 @@ def accept_citizen_request(
 	reply_text=None,
 ):
 	"""Accept a citizen affairs request, fill CA department section, and send acceptance notification."""
-	if not _is_citizen_affairs_admin() and "Department Head" not in frappe.get_roles():
+	doc = frappe.get_doc("Citizens Affairs Request", request_name)
+	if not _can_manage_request(doc):
 		frappe.throw(_("ليس لديك صلاحية لقبول الطلبات"))
 
-	doc = frappe.get_doc("Citizens Affairs Request", request_name)
 	doc.status = "Accepted"
 	doc.decision = "قبول الطلب"
 	if receiver_name:
@@ -261,7 +264,8 @@ def reject_citizen_request(
 	ca_officer_name=None,
 ):
 	"""Reject a citizen affairs request, record reasons, and send rejection notification."""
-	if not _is_citizen_affairs_admin() and "Department Head" not in frappe.get_roles():
+	doc = frappe.get_doc("Citizens Affairs Request", request_name)
+	if not _can_manage_request(doc):
 		frappe.throw(_("ليس لديك صلاحية لرفض الطلبات"))
 
 	if not rejection_reasons:
@@ -411,7 +415,7 @@ def get_all_requests(department=None, status=None, from_date=None, to_date=None)
 
 @frappe.whitelist()
 def get_user_citizen_role():
-	"""Get the user's citizen affairs role info."""
+	"""Get the user's citizen affairs role info based on Leave Settings and Department Head status."""
 	user = frappe.session.user
 	roles = frappe.get_roles(user)
 
@@ -421,14 +425,7 @@ def get_user_citizen_role():
 		pluck="name"
 	)
 
-	settings = frappe.get_single("Leave Settings")
-	admin_role = settings.citizens_affairs_admin_role or ""
-
-	is_admin = (
-		"System Manager" in roles
-		or "Citizen Affairs Manager" in roles
-		or (admin_role and admin_role in roles)
-	)
+	is_admin = _is_citizen_affairs_admin(user)
 
 	return {
 		"is_dept_head": bool(departments),
@@ -448,10 +445,24 @@ def get_departments_list():
 	)
 
 
-def _is_citizen_affairs_admin():
-	"""Check if current user has the citizens affairs admin role."""
-	roles = frappe.get_roles()
-	if "System Manager" in roles or "Citizen Affairs Manager" in roles:
+def _can_manage_request(doc):
+	"""Check if current user can accept/reject a specific request based on Leave Settings or department head."""
+	if _is_citizen_affairs_admin():
+		return True
+	user = frappe.session.user
+	if doc.target_department:
+		dept_head = frappe.db.get_value("Leave Department", doc.target_department, "department_head")
+		if dept_head and dept_head == user:
+			return True
+	return False
+
+
+def _is_citizen_affairs_admin(user=None):
+	"""Check if user has the citizens affairs admin role defined in Leave Settings or is System Manager."""
+	if not user:
+		user = frappe.session.user
+	roles = frappe.get_roles(user)
+	if "System Manager" in roles:
 		return True
 	try:
 		settings = frappe.get_single("Leave Settings")
@@ -461,3 +472,4 @@ def _is_citizen_affairs_admin():
 	except Exception:
 		pass
 	return False
+
