@@ -35,7 +35,7 @@ fixtures = [
     },
     {
         "dt": "Role",
-        "filters": [["name", "in", ["University Employee", "University President", "Department Head", "Follow Up Employee", "HR Employee", "Leave Proxy Submitter"]]]
+        "filters": [["name", "in", ["University Employee", "University President", "Department Head", "Follow Up Employee", "HR Employee", "Leave Proxy Submitter", "Citizen Affairs Manager"]]]
     }
 ]
 jinja = {

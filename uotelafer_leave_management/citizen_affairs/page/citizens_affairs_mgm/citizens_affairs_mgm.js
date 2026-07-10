@@ -1,457 +1,690 @@
-frappe.pages['citizens-affairs-mgm'].on_page_load = function (wrapper) {
-	frappe.ui.make_app_page({
-		parent: wrapper,
-		single_column: true
-	});
+// Copyright (c) 2026, Computer Center of UoT and contributors
+// For license information, please see license.txt
 
-	wrapper.ca_page = new CitizenAffairsMgmPage(wrapper);
-}
+frappe.pages["citizens-affairs-mgm"].on_page_load = function (wrapper) {
+	new CitizensAffairsManagement(wrapper);
+};
 
-class CitizenAffairsMgmPage {
+class CitizensAffairsManagement {
 	constructor(wrapper) {
-		this.page = wrapper.page;
-		this.wrapper = $(wrapper).find('.layout-main-section');
-		$(wrapper).find('.page-head').hide();
-		this.current_tab = 'department_requests';
-		this.departments = [];
-
-		frappe.require('citizens_affairs_mgm.css', () => {
-			this.init();
+		this.wrapper = $(wrapper);
+		this.page = frappe.ui.make_app_page({
+			parent: wrapper,
+			title: __("إدارة شؤون المواطنين"),
+			single_column: true
 		});
+
+		this.user_role_info = null;
+		this.current_tab = "my_department"; // 'my_department' | 'all_requests'
+		this.filters = {
+			department: "",
+			status: "All",
+			from_date: "",
+			to_date: ""
+		};
+
+		this.init();
 	}
 
 	async init() {
-		// Get user role info
-		let r = await frappe.call({
-			method: "uotelafer_leave_management.citizen_affairs.doctype.citizens_affairs_request.citizens_affairs_request.get_user_citizen_role"
-		});
-		this.role_info = r.message || {};
-
-		// Get departments
-		let d = await frappe.call({
-			method: "uotelafer_leave_management.citizen_affairs.doctype.citizens_affairs_request.citizens_affairs_request.get_departments_list"
-		});
-		this.departments = d.message || [];
-
-		// Determine default tab
-		if (this.role_info.is_dept_head) {
-			this.current_tab = 'department_requests';
-		} else if (this.role_info.is_admin) {
-			this.current_tab = 'all_requests';
-		}
+		await this.check_permissions();
+		if (!this.user_role_info) return;
 
 		this.make_ui();
 		this.load_data();
 	}
 
+	async check_permissions() {
+		try {
+			const res = await frappe.call({
+				method: "uotelafer_leave_management.citizen_affairs.doctype.citizens_affairs_request.citizens_affairs_request.get_user_citizen_role"
+			});
+			this.user_role_info = res.message;
+
+			if (!this.user_role_info.is_dept_head && !this.user_role_info.is_admin) {
+				this.page.main.html(`
+					<div class="ca-mgm-empty">
+						<div class="empty-icon">🔒</div>
+						<h3>غير مصرح لك بالوصول</h3>
+						<p>هذه الصفحة مخصصة لمدراء الكليات والأقسام ومسؤولي شعبة شؤون المواطنين فقط.</p>
+					</div>
+				`);
+				return;
+			}
+
+			// If user is admin/CA manager but not a specific dept head, default to all requests
+			if (this.user_role_info.is_admin && !this.user_role_info.is_dept_head) {
+				this.current_tab = "all_requests";
+			}
+		} catch (e) {
+			console.error(e);
+		}
+	}
+
 	make_ui() {
-		this.wrapper.empty().append(`
-			<div class="ca-mgm-page">
-				<div class="ca-mgm-header">
-					<h1>إدارة شؤون المواطنين <span class="ca-icon">🏛️</span></h1>
-					<div style="display: flex; gap: 8px; align-items: center;">
-						<button class="ca-mgm-copy-link-btn" id="btn-copy-form-link">
-							<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-								<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-								<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-							</svg>
-							نسخ رابط النموذج
+		this.page.main.html(`
+			<div class="ca-mgm-container">
+				<!-- Tabs (Only for Admins/CA Managers) -->
+				${
+					this.user_role_info.is_admin
+						? `
+					<div class="ca-mgm-tabs">
+						${
+							this.user_role_info.is_dept_head
+								? `<button class="ca-mgm-tab ${this.current_tab === 'my_department' ? 'active' : ''}" data-tab="my_department">
+									📋 طلبات قسمي
+								</button>`
+								: ""
+						}
+						<button class="ca-mgm-tab ${this.current_tab === 'all_requests' ? 'active' : ''}" data-tab="all_requests">
+							🌐 جميع طلبات الكليات والأقسام
 						</button>
 					</div>
-				</div>
+				`
+						: ""
+				}
 
-				<div class="ca-mgm-tabs">
-					${this.role_info.is_dept_head ? `<button class="ca-mgm-tab ${this.current_tab === 'department_requests' ? 'active' : ''}" data-tab="department_requests">طلبات قسمي</button>` : ''}
-					${this.role_info.is_admin ? `<button class="ca-mgm-tab ${this.current_tab === 'all_requests' ? 'active' : ''}" data-tab="all_requests">جميع الطلبات</button>` : ''}
-				</div>
-
-				<div class="ca-mgm-filters-wrapper">
-					<div class="ca-mgm-filters-header-mobile">
-						<button class="ca-mgm-filter-toggle" id="btn-toggle-ca-filters">
-							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
-							الفلاتر
-						</button>
+				<!-- Statistics Cards -->
+				<div class="ca-mgm-stats" id="ca-stats-container">
+					<div class="ca-mgm-stat-card total">
+						<div class="stat-number" id="stat-total">0</div>
+						<div class="stat-label">إجمالي الطلبات</div>
 					</div>
-					<div class="ca-mgm-filters" id="ca-filters-content">
-						<div class="ca-mgm-filter-group">
-							<label>من تاريخ</label>
-							<input type="date" id="ca-filter-from-date">
-						</div>
-						<div class="ca-mgm-filter-group">
-							<label>إلى تاريخ</label>
-							<input type="date" id="ca-filter-to-date">
-						</div>
-						${this.current_tab === 'all_requests' || this.role_info.is_admin ? `
-						<div class="ca-mgm-filter-group" id="ca-dept-filter-wrapper">
-							<label>الجهة</label>
-							<select id="ca-filter-department" style="max-width: 180px; text-overflow: ellipsis;">
-								<option value="">الكل</option>
-								${this.departments.map(d => `<option value="${d.name}">${d.department_name || d.name}</option>`).join('')}
-							</select>
-						</div>
-						` : ''}
-						<div class="ca-mgm-filter-group">
-							<label>الحالة</label>
-							<select id="ca-filter-status">
-								<option value="All">الكل</option>
-								<option value="Open">مفتوح</option>
-								<option value="Replied">تم الرد</option>
-								<option value="Closed">مغلق</option>
-							</select>
-						</div>
-						<button class="ca-mgm-filter-clear" id="btn-ca-clear-filter">مسح</button>
+					<div class="ca-mgm-stat-card open">
+						<div class="stat-number" id="stat-open">0</div>
+						<div class="stat-label">قيد الانتظار</div>
+					</div>
+					<div class="ca-mgm-stat-card accepted">
+						<div class="stat-number" id="stat-accepted">0</div>
+						<div class="stat-label">تم القبول</div>
+					</div>
+					<div class="ca-mgm-stat-card rejected">
+						<div class="stat-number" id="stat-rejected">0</div>
+						<div class="stat-label">تم الرفض</div>
+					</div>
+					<div class="ca-mgm-stat-card replied">
+						<div class="stat-number" id="stat-replied">0</div>
+						<div class="stat-label">تم الرد</div>
 					</div>
 				</div>
 
-				<div class="ca-mgm-stats" id="ca-stats-container"></div>
+				<!-- Filter Bar -->
+				<div class="ca-mgm-filter-bar">
+					<div class="filter-group" id="dept-filter-group" style="display: ${this.current_tab === 'all_requests' ? 'flex' : 'none'};">
+						<label>الجهة / الكلية:</label>
+						<select id="filter-dept">
+							<option value="">جميع الجهات</option>
+						</select>
+					</div>
+					<div class="filter-group">
+						<label>الحالة:</label>
+						<select id="filter-status">
+							<option value="All">جميع الحالات</option>
+							<option value="Open">قيد الانتظار (Open)</option>
+							<option value="Accepted">مقبول (Accepted)</option>
+							<option value="Rejected">مرفوض (Rejected)</option>
+							<option value="Replied">تم الرد (Replied)</option>
+							<option value="Closed">مغلق (Closed)</option>
+						</select>
+					</div>
+					<div class="filter-group">
+						<label>من تاريخ:</label>
+						<input type="date" id="filter-from-date">
+					</div>
+					<div class="filter-group">
+						<label>إلى تاريخ:</label>
+						<input type="date" id="filter-to-date">
+					</div>
+					<div class="filter-actions">
+						<button class="ca-mgm-action-btn detail" id="btn-reset-filters">إعادة ضبط</button>
+						<button class="ca-mgm-action-btn reply" id="btn-apply-filters">تطبيق الفرز</button>
+					</div>
+				</div>
 
-				<div class="ca-mgm-table-wrap">
-					<table class="ca-mgm-table">
-						<thead>
-							<tr>
-								<th>#</th>
-								<th>الاسم</th>
-								<th>الهاتف</th>
-								<th>البريد</th>
-								<th>الجهة المعنية</th>
-								<th>الحالة</th>
-								<th>التاريخ</th>
-								<th>الإجراءات</th>
-							</tr>
-						</thead>
-						<tbody id="ca-table-body"></tbody>
-					</table>
+				<!-- Table Container -->
+				<div class="ca-mgm-table-wrap" id="ca-table-container">
+					<div class="ca-mgm-empty">
+						<div class="empty-icon">⏳</div>
+						<h3>جاري تحميل الطلبات...</h3>
+					</div>
 				</div>
 			</div>
 		`);
 
 		this.bind_events();
+		if (this.user_role_info.is_admin) {
+			this.load_departments_filter();
+		}
 	}
 
 	bind_events() {
-		this.wrapper.find('.ca-mgm-tab').on('click', (e) => {
-			this.wrapper.find('.ca-mgm-tab').removeClass('active');
-			$(e.currentTarget).addClass('active');
-			this.current_tab = $(e.currentTarget).data('tab');
+		const self = this;
 
-			// Toggle department filter visibility
-			let dept_wrapper = this.wrapper.find('#ca-dept-filter-wrapper');
-			if (this.current_tab === 'all_requests') {
-				dept_wrapper.show();
+		// Tab Switch
+		this.wrapper.find(".ca-mgm-tab").on("click", function () {
+			self.wrapper.find(".ca-mgm-tab").removeClass("active");
+			$(this).addClass("active");
+			self.current_tab = $(this).data("tab");
+
+			if (self.current_tab === "all_requests") {
+				self.wrapper.find("#dept-filter-group").css("display", "flex");
 			} else {
-				dept_wrapper.hide();
+				self.wrapper.find("#dept-filter-group").css("display", "none");
+				self.filters.department = "";
 			}
+			self.load_data();
+		});
 
+		// Filters
+		this.wrapper.find("#btn-apply-filters").on("click", () => {
+			this.filters.department = this.wrapper.find("#filter-dept").val() || "";
+			this.filters.status = this.wrapper.find("#filter-status").val() || "All";
+			this.filters.from_date = this.wrapper.find("#filter-from-date").val() || "";
+			this.filters.to_date = this.wrapper.find("#filter-to-date").val() || "";
 			this.load_data();
 		});
 
-		this.wrapper.find('#btn-copy-form-link').on('click', () => {
-			let url = window.location.origin + '/citizen-affairs-request';
-			navigator.clipboard.writeText(url).then(() => {
-				frappe.show_alert({ message: 'تم نسخ الرابط بنجاح!', indicator: 'green' });
-			}).catch(() => {
-				// Fallback
-				let tmp = document.createElement('textarea');
-				tmp.value = url;
-				document.body.appendChild(tmp);
-				tmp.select();
-				document.execCommand('copy');
-				document.body.removeChild(tmp);
-				frappe.show_alert({ message: 'تم نسخ الرابط بنجاح!', indicator: 'green' });
+		this.wrapper.find("#btn-reset-filters").on("click", () => {
+			this.wrapper.find("#filter-dept").val("");
+			this.wrapper.find("#filter-status").val("All");
+			this.wrapper.find("#filter-from-date").val("");
+			this.wrapper.find("#filter-to-date").val("");
+			this.filters = { department: "", status: "All", from_date: "", to_date: "" };
+			this.load_data();
+		});
+	}
+
+	async load_departments_filter() {
+		try {
+			const res = await frappe.call({
+				method: "uotelafer_leave_management.citizen_affairs.doctype.citizens_affairs_request.citizens_affairs_request.get_departments_list"
 			});
-		});
-
-		this.wrapper.find('#ca-filter-from-date, #ca-filter-to-date, #ca-filter-status, #ca-filter-department').on('change', () => {
-			this.load_data();
-		});
-
-		this.wrapper.find('#btn-toggle-ca-filters').on('click', () => {
-			this.wrapper.find('#ca-filters-content').slideToggle('fast');
-		});
-
-		this.wrapper.find('#btn-ca-clear-filter').on('click', () => {
-			this.wrapper.find('#ca-filter-from-date').val('');
-			this.wrapper.find('#ca-filter-to-date').val('');
-			this.wrapper.find('#ca-filter-status').val('All');
-			this.wrapper.find('#ca-filter-department').val('');
-			this.load_data();
-		});
-	}
-
-	get_filters() {
-		return {
-			from_date: this.wrapper.find('#ca-filter-from-date').val(),
-			to_date: this.wrapper.find('#ca-filter-to-date').val(),
-			status: this.wrapper.find('#ca-filter-status').val(),
-			department: this.wrapper.find('#ca-filter-department').val() || ''
-		};
-	}
-
-	render_skeleton() {
-		let html = '';
-		for (let i = 0; i < 5; i++) {
-			html += `
-				<tr>
-					<td colspan="8">
-						<div style="display:flex; gap:16px;">
-							<div class="ca-mgm-skeleton" style="flex:0.3"></div>
-							<div class="ca-mgm-skeleton" style="flex:2"></div>
-							<div class="ca-mgm-skeleton" style="flex:1"></div>
-							<div class="ca-mgm-skeleton" style="flex:1.5"></div>
-							<div class="ca-mgm-skeleton" style="flex:1.5"></div>
-							<div class="ca-mgm-skeleton" style="flex:1"></div>
-							<div class="ca-mgm-skeleton" style="flex:1"></div>
-							<div class="ca-mgm-skeleton" style="flex:1"></div>
-						</div>
-					</td>
-				</tr>
-			`;
+			if (res.message) {
+				const select = this.wrapper.find("#filter-dept");
+				select.empty().append('<option value="">جميع الجهات</option>');
+				res.message.forEach((d) => {
+					select.append(`<option value="${d.name}">${d.department_name || d.name}</option>`);
+				});
+			}
+		} catch (e) {
+			console.error(e);
 		}
-		this.wrapper.find('#ca-table-body').html(html);
 	}
 
 	async load_data() {
-		this.render_skeleton();
-
-		let method = '';
-		if (this.current_tab === 'department_requests') {
-			method = 'uotelafer_leave_management.citizen_affairs.doctype.citizens_affairs_request.citizens_affairs_request.get_department_requests';
-		} else {
-			method = 'uotelafer_leave_management.citizen_affairs.doctype.citizens_affairs_request.citizens_affairs_request.get_all_requests';
-		}
-
-		let r = await frappe.call({
-			method: method,
-			args: this.get_filters()
-		});
-
-		let data = r.message || [];
-		this.render_table(data);
-		this.render_stats(data);
-	}
-
-	render_stats(data) {
-		let total = data.length;
-		let open = data.filter(d => d.status === 'Open').length;
-		let replied = data.filter(d => d.status === 'Replied').length;
-		let closed = data.filter(d => d.status === 'Closed').length;
-
-		this.wrapper.find('#ca-stats-container').html(`
-			<div class="ca-mgm-stat-card total">
-				<div class="stat-number">${total}</div>
-				<div class="stat-label">الإجمالي</div>
-			</div>
-			<div class="ca-mgm-stat-card open">
-				<div class="stat-number">${open}</div>
-				<div class="stat-label">مفتوح</div>
-			</div>
-			<div class="ca-mgm-stat-card replied">
-				<div class="stat-number">${replied}</div>
-				<div class="stat-label">تم الرد</div>
-			</div>
-			<div class="ca-mgm-stat-card closed">
-				<div class="stat-number">${closed}</div>
-				<div class="stat-label">مغلق</div>
+		this.wrapper.find("#ca-table-container").html(`
+			<div class="ca-mgm-empty">
+				<div class="empty-icon">⏳</div>
+				<h3>جاري تحميل الطلبات...</h3>
 			</div>
 		`);
+
+		const method =
+			this.current_tab === "all_requests"
+				? "uotelafer_leave_management.citizen_affairs.doctype.citizens_affairs_request.citizens_affairs_request.get_all_requests"
+				: "uotelafer_leave_management.citizen_affairs.doctype.citizens_affairs_request.citizens_affairs_request.get_department_requests";
+
+		try {
+			const res = await frappe.call({
+				method: method,
+				args: {
+					department: this.filters.department,
+					status: this.filters.status,
+					from_date: this.filters.from_date,
+					to_date: this.filters.to_date
+				}
+			});
+
+			const requests = res.message || [];
+			this.update_stats(requests);
+			this.render_table(requests);
+		} catch (e) {
+			console.error(e);
+			this.wrapper.find("#ca-table-container").html(`
+				<div class="ca-mgm-empty">
+					<div class="empty-icon">❌</div>
+					<h3>حدث خطأ أثناء جلب البيانات</h3>
+				</div>
+			`);
+		}
 	}
 
-	get_status_html(status) {
-		let cls = '', label = status;
-		if (status === 'Open') { cls = 'open'; label = 'مفتوح'; }
-		else if (status === 'Replied') { cls = 'replied'; label = 'تم الرد'; }
-		else if (status === 'Closed') { cls = 'closed'; label = 'مغلق'; }
-		return `<span class="ca-status ${cls}"><span class="status-dot"></span>${label}</span>`;
+	update_stats(requests) {
+		const total = requests.length;
+		const open = requests.filter((r) => r.status === "Open").length;
+		const accepted = requests.filter((r) => r.status === "Accepted").length;
+		const rejected = requests.filter((r) => r.status === "Rejected").length;
+		const replied = requests.filter((r) => r.status === "Replied").length;
+
+		this.wrapper.find("#stat-total").text(total);
+		this.wrapper.find("#stat-open").text(open);
+		this.wrapper.find("#stat-accepted").text(accepted);
+		this.wrapper.find("#stat-rejected").text(rejected);
+		this.wrapper.find("#stat-replied").text(replied);
 	}
 
-	render_table(data) {
-		let tbody = this.wrapper.find('#ca-table-body');
-		tbody.empty();
-
-		if (data.length === 0) {
-			tbody.html(`
-				<tr>
-					<td colspan="8">
-						<div class="ca-mgm-empty">
-							<div class="empty-icon">📭</div>
-							<p>لا توجد طلبات لعرضها</p>
-						</div>
-					</td>
-				</tr>
+	render_table(requests) {
+		if (!requests.length) {
+			this.wrapper.find("#ca-table-container").html(`
+				<div class="ca-mgm-empty">
+					<div class="empty-icon">📭</div>
+					<h3>لا توجد طلبات مطابقة</h3>
+					<p>لم يتم العثور على أي طلبات بناءً على الفرز المحدد.</p>
+				</div>
 			`);
 			return;
 		}
 
-		data.forEach((row, idx) => {
-			let details_text = row.request_details ? (row.request_details.length > 30 ? row.request_details.substring(0, 30) + '...' : row.request_details) : '-';
-			let creation_date = row.creation ? frappe.datetime.str_to_user(row.creation.split(' ')[0]) : '-';
+		let tbody = "";
+		requests.forEach((req) => {
+			let status_class = "open";
+			let status_text = "قيد الانتظار";
+			if (req.status === "Accepted") {
+				status_class = "accepted";
+				status_text = "مقبول ✓";
+			} else if (req.status === "Rejected") {
+				status_class = "rejected";
+				status_text = "مرفوض ✕";
+			} else if (req.status === "Replied") {
+				status_class = "replied";
+				status_text = "تم الرد";
+			} else if (req.status === "Closed") {
+				status_class = "closed";
+				status_text = "مغلق";
+			}
 
-			let tr = $(`
-				<tr>
-					<td><b>${idx + 1}</b></td>
-					<td><b>${row.full_name}</b></td>
-					<td>${row.phone_number || '-'}</td>
-					<td style="direction: ltr; text-align: right;">${row.email || '-'}</td>
-					<td>${row.target_department || '-'}</td>
-					<td>${this.get_status_html(row.status)}</td>
-					<td>${creation_date}</td>
+			const date_str = frappe.datetime.str_to_user(req.creation.split(" ")[0]);
+
+			tbody += `
+				<tr data-name="${req.name}">
 					<td>
-						<div style="display: flex; gap: 6px; flex-wrap: nowrap;">
-							<button class="ca-mgm-action-btn detail" data-name="${row.name}">تفاصيل</button>
-							${row.status === 'Open' ? `<button class="ca-mgm-action-btn reply" data-name="${row.name}">رد</button>` : ''}
-							${row.status === 'Replied' ? `<button class="ca-mgm-action-btn close-req" data-name="${row.name}">إغلاق</button>` : ''}
-						</div>
+						<strong style="color: #2563eb;">${req.name}</strong><br>
+						<span style="font-size: 12px; color: var(--text-muted);">${date_str}</span>
+					</td>
+					<td>
+						<strong>${frappe.utils.escape_html(req.full_name)}</strong><br>
+						<span style="font-size: 12px; color: var(--text-muted);">${frappe.utils.escape_html(req.occupation || '-')} | ${frappe.utils.escape_html(req.address_area || '-')}</span>
+					</td>
+					<td>
+						<span style="font-weight: 600;">${frappe.utils.escape_html(req.target_department)}</span><br>
+						<span style="font-size: 12px; color: var(--text-muted);">${frappe.utils.escape_html(req.phone_number)}</span>
+					</td>
+					<td>
+						<strong>${frappe.utils.escape_html(req.request_subject || 'بدون موضوع')}</strong><br>
+						<span style="font-size: 12px; color: var(--text-muted);">${frappe.utils.escape_html((req.request_details || '').substring(0, 50))}...</span>
+					</td>
+					<td>
+						<span class="ca-status ${status_class}">
+							<span class="status-dot"></span>
+							${status_text}
+						</span>
+					</td>
+					<td style="white-space: nowrap;">
+						<button class="ca-mgm-action-btn detail btn-show-details" title="عرض التفاصيل">تفاصيل</button>
+						<button class="ca-mgm-action-btn print btn-print-form" title="طباعة الاستمارة الرسمية">🖨️</button>
+						${
+							["Open", "Replied"].includes(req.status)
+								? `
+							<button class="ca-mgm-action-btn accept btn-accept-req" title="قبول الطلب">✓ القبول</button>
+							<button class="ca-mgm-action-btn reject btn-reject-req" title="رفض الطلب">✕ الرفض</button>
+							<button class="ca-mgm-action-btn reply btn-reply-req" title="الرد بملاحظة">💬</button>
+						`
+								: ""
+						}
 					</td>
 				</tr>
-			`);
+			`;
+		});
 
-			tr.find('.detail').on('click', () => this.show_detail_dialog(row));
-			tr.find('.reply').on('click', () => this.show_reply_dialog(row));
-			tr.find('.close-req').on('click', () => this.close_request(row));
+		const html = `
+			<table class="ca-mgm-table">
+				<thead>
+					<tr>
+						<th>رقم الطلب والتاريخ</th>
+						<th>مقدم الطلب والمهنة</th>
+						<th>الجهة المعنية والهاتف</th>
+						<th>الموضوع والتفاصيل</th>
+						<th>الحالة</th>
+						<th>الإجراءات</th>
+					</tr>
+				</thead>
+				<tbody>
+					${tbody}
+				</tbody>
+			</table>
+		`;
 
-			tbody.append(tr);
+		this.wrapper.find("#ca-table-container").html(html);
+		this.bind_table_events(requests);
+	}
+
+	bind_table_events(requests) {
+		const self = this;
+
+		this.wrapper.find(".btn-show-details").on("click", function (e) {
+			e.stopPropagation();
+			const name = $(this).closest("tr").data("name");
+			const req = requests.find((r) => r.name === name);
+			if (req) self.show_details_dialog(req);
+		});
+
+		this.wrapper.find(".btn-print-form").on("click", function (e) {
+			e.stopPropagation();
+			const name = $(this).closest("tr").data("name");
+			const url = frappe.urllib.get_full_url(
+				`/printview?doctype=Citizens%20Affairs%20Request&name=${encodeURIComponent(name)}&format=Citizen%20Affairs%20Form`
+			);
+			window.open(url, "_blank");
+		});
+
+		this.wrapper.find(".btn-accept-req").on("click", function (e) {
+			e.stopPropagation();
+			const name = $(this).closest("tr").data("name");
+			const req = requests.find((r) => r.name === name);
+			if (req) self.accept_dialog(req);
+		});
+
+		this.wrapper.find(".btn-reject-req").on("click", function (e) {
+			e.stopPropagation();
+			const name = $(this).closest("tr").data("name");
+			const req = requests.find((r) => r.name === name);
+			if (req) self.reject_dialog(req);
+		});
+
+		this.wrapper.find(".btn-reply-req").on("click", function (e) {
+			e.stopPropagation();
+			const name = $(this).closest("tr").data("name");
+			const req = requests.find((r) => r.name === name);
+			if (req) self.reply_dialog(req);
 		});
 	}
 
-	show_detail_dialog(row) {
-		let reply_html = '';
-		if (row.reply_text) {
-			let replied_by_name = row.replied_by || '-';
-			let replied_on = row.replied_on ? frappe.datetime.str_to_user(row.replied_on) : '-';
-			reply_html = `
-				<div class="ca-mgm-reply-box">
-					<div class="reply-label">الرد</div>
-					<div class="reply-text">${row.reply_text}</div>
-					<div class="reply-meta">بواسطة: ${replied_by_name} — ${replied_on}</div>
+	show_details_dialog(req) {
+		const self = this;
+		const date_str = frappe.datetime.str_to_user(req.creation.split(" ")[0]);
+
+		let ca_section_html = "";
+		if (req.status === "Accepted" || req.status === "Rejected") {
+			ca_section_html = `
+				<div style="background: ${req.status === 'Accepted' ? '#f0fdf4' : '#fef2f2'}; border: 1px solid ${req.status === 'Accepted' ? '#bbf7d0' : '#fecaca'}; border-radius: 12px; padding: 16px; margin-top: 16px;">
+					<h4 style="margin: 0 0 10px 0; color: ${req.status === 'Accepted' ? '#166534' : '#991b1b'};">📋 قسم شعبة شؤون المواطنين (${req.decision || (req.status === 'Accepted' ? 'قبول الطلب' : 'رفض الطلب')}):</h4>
+					<p style="margin: 4px 0;"><strong>اسم مستلم الطلب:</strong> ${req.receiver_name || '-'}</p>
+					<p style="margin: 4px 0;"><strong>تاريخ الاستلام:</strong> ${req.receipt_date || '-'}</p>
+					<p style="margin: 4px 0;"><strong>التوصية:</strong> ${req.recommendation || '-'}</p>
+					${req.rejection_reasons ? `<p style="margin: 4px 0; color: #dc2626;"><strong>مبررات الرفض:</strong> ${req.rejection_reasons}</p>` : ''}
+					<p style="margin: 4px 0;"><strong>مسؤول الشعبة:</strong> ${req.ca_officer_name || '-'} — بتاريخ (${req.ca_officer_date || '-'})</p>
 				</div>
 			`;
 		}
 
-		let creation_date = row.creation ? frappe.datetime.str_to_user(row.creation.split(' ')[0]) : '-';
+		let reply_html = "";
+		if (req.reply_text) {
+			reply_html = `
+				<div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 16px; margin-top: 16px;">
+					<h4 style="margin: 0 0 8px 0; color: #1e40af;">💬 الرد المرسل للمواطن:</h4>
+					<p style="margin: 0; white-space: pre-wrap;">${req.reply_text}</p>
+					<small style="color: #64748b; display: block; margin-top: 8px;">بواسطة: ${req.replied_by || '-'} في ${frappe.datetime.str_to_user(req.replied_on || '')}</small>
+				</div>
+			`;
+		}
 
-		let dialog = new frappe.ui.Dialog({
-			title: `تفاصيل الطلب - ${row.full_name}`,
-			size: 'large',
+		const d = new frappe.ui.Dialog({
+			title: `تفاصيل استمارة شؤون المواطنين (${req.name})`,
+			size: "large",
 			fields: [
 				{
-					fieldtype: 'HTML',
-					fieldname: 'detail_html',
+					fieldtype: "HTML",
+					fieldname: "details_html",
 					options: `
-						<div dir="rtl" style="font-family: 'Cairo', sans-serif;">
-							<div class="ca-mgm-detail-grid">
-								<div class="ca-mgm-detail-item">
-									<div class="detail-label">الاسم الكامل</div>
-									<div class="detail-value">${row.full_name}</div>
+						<div style="font-size: 14px; line-height: 1.8;">
+							<div style="display: flex; justify-content: space-between; border-bottom: 2px solid var(--border-color); padding-bottom: 12px; margin-bottom: 16px;">
+								<div>
+									<h3 style="margin: 0; color: #2563eb;">${req.full_name}</h3>
+									<span style="color: var(--text-muted);">${req.occupation || '-'} | ${req.address_area || '-'}</span>
 								</div>
-								<div class="ca-mgm-detail-item">
-									<div class="detail-label">رقم الهاتف</div>
-									<div class="detail-value">${row.phone_number || '-'}</div>
-								</div>
-								<div class="ca-mgm-detail-item">
-									<div class="detail-label">البريد الإلكتروني</div>
-									<div class="detail-value" style="direction: ltr; text-align: right;">${row.email || '-'}</div>
-								</div>
-								<div class="ca-mgm-detail-item">
-									<div class="detail-label">الجهة المعنية</div>
-									<div class="detail-value">${row.target_department || '-'}</div>
-								</div>
-								<div class="ca-mgm-detail-item">
-									<div class="detail-label">الحالة</div>
-									<div class="detail-value">${this.get_status_html(row.status)}</div>
-								</div>
-								<div class="ca-mgm-detail-item">
-									<div class="detail-label">التاريخ</div>
-									<div class="detail-value">${creation_date}</div>
-								</div>
-								<div class="ca-mgm-detail-item full-width">
-									<div class="detail-label">تفاصيل الطلب</div>
-									<div class="detail-value" style="line-height: 1.8; font-weight: 500;">${row.request_details || '-'}</div>
+								<div style="text-align: left;">
+									<strong style="display: block;">${req.name}</strong>
+									<span style="color: var(--text-muted);">${date_str}</span>
 								</div>
 							</div>
+
+							<table style="width: 100%; border-collapse: collapse; margin-bottom: 16px;">
+								<tr>
+									<td style="padding: 6px 0; width: 25%;"><strong>الجهة المعنية:</strong></td>
+									<td style="padding: 6px 0;">${req.target_department}</td>
+									<td style="padding: 6px 0; width: 20%;"><strong>رقم الهاتف:</strong></td>
+									<td style="padding: 6px 0;"><a href="tel:${req.phone_number}" style="color: #2563eb; font-weight: bold;">${req.phone_number}</a></td>
+								</tr>
+								<tr>
+									<td style="padding: 6px 0;"><strong>البريد الإلكتروني:</strong></td>
+									<td style="padding: 6px 0;"><a href="mailto:${req.email}" style="color: #2563eb;">${req.email}</a></td>
+									<td style="padding: 6px 0;"><strong>الحالة الحالية:</strong></td>
+									<td style="padding: 6px 0;"><b>${req.status}</b></td>
+								</tr>
+							</table>
+
+							<div style="background: var(--card-bg); border: 1.5px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+								<h4 style="margin: 0 0 8px 0; color: #2563eb;">م / ${req.request_subject || 'بدون موضوع'}</h4>
+								<p style="margin: 0; white-space: pre-wrap; font-size: 15px;">${req.request_details}</p>
+							</div>
+
+							${
+								req.attachment_1 || req.attachment_2
+									? `
+								<div style="margin-bottom: 16px;">
+									<strong>📎 المرفقات الداعمة:</strong><br>
+									${req.attachment_1 ? `<div>• المرفق 1: <a href="${req.attachment_1}" target="_blank" style="color:#2563eb;">${req.attachment_1}</a></div>` : ''}
+									${req.attachment_2 ? `<div>• المرفق 2: <a href="${req.attachment_2}" target="_blank" style="color:#2563eb;">${req.attachment_2}</a></div>` : ''}
+								</div>
+							`
+									: ""
+							}
+
+							<div style="border-top: 1px dashed var(--border-color); padding-top: 12px; color: var(--text-muted); font-size: 13px;">
+								✍️ التعهد: التزم بصحة المعلومات الواردة في الطلب وأتحمل المسؤولية كافة وعليه أوقع.<br>
+								<b>توقيع مقدم الطلب:</b> ${req.applicant_signature_name || req.full_name} — <b>بتاريخ:</b> ${req.applicant_submission_date || date_str}
+							</div>
+
+							${ca_section_html}
 							${reply_html}
 						</div>
 					`
 				}
-			]
+			],
+			primary_action_label: "🖨️ طباعة الاستمارة الرسمية",
+			primary_action() {
+				const url = frappe.urllib.get_full_url(
+					`/printview?doctype=Citizens%20Affairs%20Request&name=${encodeURIComponent(req.name)}&format=Citizen%20Affairs%20Form`
+				);
+				window.open(url, "_blank");
+			}
 		});
 
-		if (row.status === 'Open') {
-			dialog.set_primary_action('الرد على الطلب', () => {
-				dialog.hide();
-				this.show_reply_dialog(row);
-			});
+		// Add Accept / Reject buttons right in the modal footer if open/replied
+		if (["Open", "Replied"].includes(req.status)) {
+			d.add_custom_action("✓ قبول الطلب", () => {
+				d.hide();
+				self.accept_dialog(req);
+			}, "btn-success");
+
+			d.add_custom_action("✕ رفض الطلب", () => {
+				d.hide();
+				self.reject_dialog(req);
+			}, "btn-danger");
 		}
 
-		dialog.show();
-		dialog.$wrapper.find('.modal-dialog').css('max-width', '700px');
+		d.show();
 	}
 
-	show_reply_dialog(row) {
-		let dialog = new frappe.ui.Dialog({
-			title: `الرد على طلب - ${row.full_name}`,
+	accept_dialog(req) {
+		const self = this;
+		const d = new frappe.ui.Dialog({
+			title: `اعتماد قبول طلب المواطن (${req.name})`,
 			fields: [
 				{
-					fieldtype: 'HTML',
-					fieldname: 'request_summary',
-					options: `
-						<div dir="rtl" style="background: var(--bg-light-gray, #f1f5f9); padding: 14px; border-radius: 10px; margin-bottom: 16px; font-family: 'Cairo', sans-serif;">
-							<div style="font-size: 13px; color: var(--text-muted); font-weight: 700; margin-bottom: 6px;">ملخص الطلب:</div>
-							<div style="font-size: 15px; color: var(--text-color); line-height: 1.7;">${row.request_details || '-'}</div>
-							<div style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">
-								<b>${row.full_name}</b> — ${row.target_department} — ${row.email}
-							</div>
-						</div>
-					`
+					fieldtype: "Data",
+					fieldname: "receiver_name",
+					label: "اسم مستلم الطلب",
+					default: frappe.session.user_fullname
 				},
 				{
-					fieldtype: 'Text',
-					fieldname: 'reply_text',
-					label: 'نص الرد',
-					reqd: 1,
-					description: 'سيتم إرسال هذا الرد عبر البريد الإلكتروني إلى المواطن'
+					fieldtype: "Date",
+					fieldname: "receipt_date",
+					label: "تاريخ الاستلام",
+					default: frappe.datetime.get_today()
+				},
+				{
+					fieldtype: "Text",
+					fieldname: "recommendation",
+					label: "التوصية",
+					default: "الموافقة على الطلب وفق الضوابط والتعليمات وسياقات العمل."
+				},
+				{
+					fieldtype: "Data",
+					fieldname: "ca_officer_name",
+					label: "مسؤول شعبة شؤون المواطنين",
+					default: frappe.session.user_fullname
+				},
+				{
+					fieldtype: "Text",
+					fieldname: "reply_text",
+					label: "نص إشعار القبول (الذي سيتم إرساله بالبريد الإلكتروني للمواطن)",
+					default: `تم الموافقة وقبول طلبكم رقم (${req.name}) الوارد إلى ${req.target_department} وسيتم اتخاذ الإجراء اللازم.`
 				}
 			],
-			primary_action_label: 'إرسال الرد',
-			primary_action: (values) => {
+			primary_action_label: "تأكيد القبول وإرسال الإشعار",
+			primary_action(values) {
 				frappe.call({
-					method: 'uotelafer_leave_management.citizen_affairs.doctype.citizens_affairs_request.citizens_affairs_request.reply_to_request',
+					method: "uotelafer_leave_management.citizen_affairs.doctype.citizens_affairs_request.citizens_affairs_request.accept_citizen_request",
 					args: {
-						request_name: row.name,
+						request_name: req.name,
+						receiver_name: values.receiver_name,
+						receipt_date: values.receipt_date,
+						recommendation: values.recommendation,
+						ca_officer_name: values.ca_officer_name,
 						reply_text: values.reply_text
 					},
 					freeze: true,
-					freeze_message: 'جاري إرسال الرد...',
-					callback: (r) => {
+					freeze_message: "جاري حفظ قرار القبول وإرسال الإشعار للمواطن...",
+					callback: function (r) {
 						if (r.message && r.message.success) {
-							frappe.show_alert({ message: 'تم إرسال الرد بنجاح وإخطار المواطن عبر البريد الإلكتروني', indicator: 'green' });
-							dialog.hide();
-							this.load_data();
+							frappe.show_alert({
+								message: "تم قبول الطلب وإرسال الإشعار بنجاح",
+								indicator: "green"
+							});
+							d.hide();
+							self.load_data();
 						}
 					}
 				});
 			}
 		});
-		dialog.show();
-		dialog.$wrapper.find('.modal-dialog').css('max-width', '600px');
+		d.show();
 	}
 
-	close_request(row) {
-		frappe.confirm('هل أنت متأكد من إغلاق هذا الطلب؟', () => {
-			frappe.call({
-				method: 'frappe.client.set_value',
-				args: {
-					doctype: 'Citizens Affairs Request',
-					name: row.name,
-					fieldname: 'status',
-					value: 'Closed'
+	reject_dialog(req) {
+		const self = this;
+		const d = new frappe.ui.Dialog({
+			title: `الاعتذار عن قبول الطلب - رفض الطلب (${req.name})`,
+			fields: [
+				{
+					fieldtype: "Text",
+					fieldname: "rejection_reasons",
+					label: "مبررات وأسباب رفض الطلب (مطلوب)",
+					reqd: 1,
+					description: "يرجى ذكر المبررات بوضوح ودقة حيث سيتم إرسالها لمقدم الطلب عبر البريد الإلكتروني"
 				},
-				callback: (r) => {
-					if (!r.exc) {
-						frappe.show_alert({ message: 'تم إغلاق الطلب بنجاح', indicator: 'green' });
-						this.load_data();
-					}
+				{
+					fieldtype: "Data",
+					fieldname: "receiver_name",
+					label: "اسم مستلم الطلب",
+					default: frappe.session.user_fullname
+				},
+				{
+					fieldtype: "Date",
+					fieldname: "receipt_date",
+					label: "تاريخ الاستلام",
+					default: frappe.datetime.get_today()
+				},
+				{
+					fieldtype: "Text",
+					fieldname: "recommendation",
+					label: "التوصية",
+					default: "نعتذر عن قبول الطلب لعدم استيفاء الضوابط أو الشروط المطلوبة."
+				},
+				{
+					fieldtype: "Data",
+					fieldname: "ca_officer_name",
+					label: "مسؤول شعبة شؤون المواطنين",
+					default: frappe.session.user_fullname
 				}
-			});
+			],
+			primary_action_label: "تأكيد الرفض وإرسال المبررات",
+			primary_action(values) {
+				frappe.call({
+					method: "uotelafer_leave_management.citizen_affairs.doctype.citizens_affairs_request.citizens_affairs_request.reject_citizen_request",
+					args: {
+						request_name: req.name,
+						rejection_reasons: values.rejection_reasons,
+						receiver_name: values.receiver_name,
+						receipt_date: values.receipt_date,
+						recommendation: values.recommendation,
+						ca_officer_name: values.ca_officer_name
+					},
+					freeze: true,
+					freeze_message: "جاري حفظ الرفض وإرسال المبررات للمواطن...",
+					callback: function (r) {
+						if (r.message && r.message.success) {
+							frappe.show_alert({
+								message: "تم حفظ الرفض وإشعار المواطن بالمبررات",
+								indicator: "red"
+							});
+							d.hide();
+							self.load_data();
+						}
+					}
+				});
+			}
 		});
+		d.show();
+	}
+
+	reply_dialog(req) {
+		const self = this;
+		const d = new frappe.ui.Dialog({
+			title: `إرسال رد أو ملاحظة لمقدم الطلب (${req.name})`,
+			fields: [
+				{
+					fieldtype: "Text",
+					fieldname: "reply_text",
+					label: "نص الرد",
+					reqd: 1,
+					default: req.reply_text || ""
+				}
+			],
+			primary_action_label: "إرسال الرد بالبريد الإلكتروني",
+			primary_action(values) {
+				frappe.call({
+					method: "uotelafer_leave_management.citizen_affairs.doctype.citizens_affairs_request.citizens_affairs_request.reply_to_request",
+					args: {
+						request_name: req.name,
+						reply_text: values.reply_text
+					},
+					freeze: true,
+					freeze_message: "جاري إرسال الرد...",
+					callback: function (r) {
+						if (r.message && r.message.success) {
+							frappe.show_alert({
+								message: "تم إرسال الرد بنجاح",
+								indicator: "green"
+							});
+							d.hide();
+							self.load_data();
+						}
+					}
+				});
+			}
+		});
+		d.show();
 	}
 }

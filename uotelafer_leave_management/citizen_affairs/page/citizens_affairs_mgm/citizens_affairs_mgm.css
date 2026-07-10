@@ -212,6 +212,8 @@
 .ca-mgm-stat-card.total .stat-number { color: #2563eb; }
 .ca-mgm-stat-card.open .stat-number { color: #f59e0b; }
 .ca-mgm-stat-card.replied .stat-number { color: #10b981; }
+.ca-mgm-stat-card.accepted .stat-number { color: #16a34a; }
+.ca-mgm-stat-card.rejected .stat-number { color: #dc2626; }
 .ca-mgm-stat-card.closed .stat-number { color: #6b7280; }
 
 /* ===== Table ===== */
@@ -277,6 +279,14 @@
     background: #e2e8f0;
     color: #475569;
 }
+.ca-status.accepted {
+    background: #dcfce7;
+    color: #166534;
+}
+.ca-status.rejected {
+    background: #fee2e2;
+    color: #991b1b;
+}
 .ca-status .status-dot {
     width: 8px;
     height: 8px;
@@ -285,6 +295,8 @@
 }
 .ca-status.open .status-dot { background: #f59e0b; }
 .ca-status.replied .status-dot { background: #10b981; }
+.ca-status.accepted .status-dot { background: #22c55e; }
+.ca-status.rejected .status-dot { background: #ef4444; }
 .ca-status.closed .status-dot { background: #64748b; }
 
 /* ===== Action Buttons ===== */
@@ -319,6 +331,30 @@
     background: linear-gradient(135deg, #6b7280, #4b5563);
     color: #fff;
     box-shadow: 0 2px 8px rgba(107,114,128,.3);
+}
+.ca-mgm-action-btn.accept {
+    background: linear-gradient(135deg, #16a34a, #15803d);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(22,163,74,.3);
+}
+.ca-mgm-action-btn.accept:hover {
+    box-shadow: 0 4px 14px rgba(22,163,74,.45);
+}
+.ca-mgm-action-btn.reject {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(220,38,38,.3);
+}
+.ca-mgm-action-btn.reject:hover {
+    box-shadow: 0 4px 14px rgba(220,38,38,.45);
+}
+.ca-mgm-action-btn.print {
+    background: linear-gradient(135deg, #0284c7, #0369a1);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(2,132,199,.3);
+}
+.ca-mgm-action-btn.print:hover {
+    box-shadow: 0 4px 14px rgba(2,132,199,.45);
 }
 
 /* ===== Empty State ===== */

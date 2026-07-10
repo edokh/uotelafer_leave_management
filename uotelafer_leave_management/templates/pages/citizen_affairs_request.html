@@ -1,4 +1,4 @@
-{%- block title %}شؤون المواطنين - تقديم طلب{% endblock -%}
+{%- block title %}استمارة شؤون المواطنين - جامعة تلعفر{% endblock -%}
 
 {%- block head_include %}
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,6 +12,7 @@ body {
 	direction: rtl;
 	min-height: 100vh;
 	background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+	color: #f8fafc;
 }
 
 .ca-page-wrapper {
@@ -31,7 +32,7 @@ body {
 	position: absolute;
 	border-radius: 50%;
 	filter: blur(100px);
-	opacity: 0.3;
+	opacity: 0.25;
 	animation: ca-float 8s ease-in-out infinite alternate;
 }
 .ca-page-wrapper::before {
@@ -48,7 +49,7 @@ body {
 
 .ca-container {
 	width: 100%;
-	max-width: 680px;
+	max-width: 760px;
 	position: relative;
 	z-index: 1;
 }
@@ -58,45 +59,66 @@ body {
 	text-align: center;
 	margin-bottom: 32px;
 }
-.ca-logo-icon {
-	width: 72px; height: 72px;
-	background: linear-gradient(135deg, #2563eb, #7c3aed);
+.ca-header-logo {
+	width: 100px;
+	height: 100px;
 	border-radius: 20px;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	font-size: 36px;
+	object-fit: contain;
+	background: #fff;
+	padding: 6px;
+	box-shadow: 0 8px 32px rgba(37,99,235,.35);
 	margin-bottom: 16px;
-	box-shadow: 0 8px 32px rgba(37,99,235,.4);
 	animation: ca-pulse 3s ease-in-out infinite;
 }
 .ca-header h1 {
-	font-size: 32px;
+	font-size: 30px;
 	font-weight: 900;
 	color: #f8fafc;
 	letter-spacing: -0.5px;
+	margin-bottom: 6px;
+}
+.ca-header h3 {
+	font-size: 18px;
+	font-weight: 700;
+	color: #60a5fa;
 	margin-bottom: 8px;
 }
 .ca-header p {
-	font-size: 16px;
+	font-size: 15px;
 	color: #94a3b8;
 	font-weight: 500;
 }
 
 /* Card */
 .ca-card {
-	background: rgba(30, 41, 59, 0.7);
+	background: rgba(30, 41, 59, 0.75);
 	backdrop-filter: blur(20px);
 	-webkit-backdrop-filter: blur(20px);
-	border: 1px solid rgba(148, 163, 184, 0.12);
+	border: 1px solid rgba(148, 163, 184, 0.16);
 	border-radius: 24px;
 	padding: 40px;
-	box-shadow: 0 20px 60px rgba(0,0,0,.3);
+	box-shadow: 0 20px 60px rgba(0,0,0,.35);
+}
+
+.ca-section-title {
+	font-size: 18px;
+	font-weight: 800;
+	color: #60a5fa;
+	border-bottom: 2px solid rgba(96, 165, 250, 0.2);
+	padding-bottom: 8px;
+	margin-top: 24px;
+	margin-bottom: 18px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.ca-section-title:first-of-type {
+	margin-top: 0;
 }
 
 /* Form Fields */
 .ca-field {
-	margin-bottom: 22px;
+	margin-bottom: 20px;
 }
 .ca-field label {
 	display: block;
@@ -109,16 +131,18 @@ body {
 	color: #f87171;
 	margin-right: 4px;
 }
-.ca-field input,
+.ca-field input[type="text"],
+.ca-field input[type="tel"],
+.ca-field input[type="email"],
 .ca-field select,
 .ca-field textarea {
 	width: 100%;
-	padding: 14px 18px;
-	border: 1.5px solid rgba(148, 163, 184, 0.2);
+	padding: 13px 16px;
+	border: 1.5px solid rgba(148, 163, 184, 0.25);
 	border-radius: 14px;
-	font-size: 16px;
+	font-size: 15px;
 	font-family: inherit;
-	background: rgba(15, 23, 42, 0.6);
+	background: rgba(15, 23, 42, 0.65);
 	color: #f1f5f9;
 	transition: border-color .25s, box-shadow .25s, background .25s;
 	outline: none;
@@ -132,7 +156,7 @@ body {
 .ca-field textarea:focus {
 	border-color: #3b82f6;
 	box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
-	background: rgba(15, 23, 42, 0.8);
+	background: rgba(15, 23, 42, 0.85);
 }
 .ca-field select {
 	-webkit-appearance: none;
@@ -158,6 +182,34 @@ body {
 }
 .ca-field-row .ca-field {
 	flex: 1;
+}
+
+/* Pledge Box */
+.ca-pledge-box {
+	background: rgba(30, 58, 138, 0.25);
+	border: 1.5px solid rgba(96, 165, 250, 0.3);
+	border-radius: 14px;
+	padding: 18px;
+	margin-top: 10px;
+	margin-bottom: 24px;
+}
+.ca-pledge-label {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	cursor: pointer;
+	font-size: 15px;
+	font-weight: 700;
+	color: #f1f5f9;
+	line-height: 1.6;
+}
+.ca-pledge-label input[type="checkbox"] {
+	width: 20px;
+	height: 20px;
+	margin-top: 2px;
+	accent-color: #2563eb;
+	cursor: pointer;
+	flex-shrink: 0;
 }
 
 /* Error state */
@@ -192,7 +244,7 @@ body {
 	cursor: pointer;
 	box-shadow: 0 8px 32px rgba(37,99,235,.35);
 	transition: transform .2s, box-shadow .2s, opacity .2s;
-	margin-top: 8px;
+	margin-top: 10px;
 	position: relative;
 	overflow: hidden;
 }
@@ -251,13 +303,13 @@ body {
 }
 .ca-success-ref {
 	display: inline-block;
-	background: rgba(34, 197, 94, 0.1);
-	border: 1px solid rgba(34, 197, 94, 0.3);
+	background: rgba(34, 197, 94, 0.15);
+	border: 1.5px solid rgba(34, 197, 94, 0.4);
 	color: #4ade80;
-	padding: 10px 24px;
-	border-radius: 12px;
-	font-size: 15px;
-	font-weight: 700;
+	padding: 12px 28px;
+	border-radius: 14px;
+	font-size: 18px;
+	font-weight: 800;
 	margin-bottom: 24px;
 }
 .ca-new-request-btn {
@@ -286,8 +338,8 @@ body {
 	100% { transform: translate(30px, -20px) scale(1.1); }
 }
 @keyframes ca-pulse {
-	0%, 100% { box-shadow: 0 8px 32px rgba(37,99,235,.4); }
-	50% { box-shadow: 0 8px 48px rgba(124,58,237,.5); }
+	0%, 100% { box-shadow: 0 8px 32px rgba(37,99,235,.35); }
+	50% { box-shadow: 0 8px 48px rgba(124,58,237,.45); }
 }
 @keyframes ca-spin {
 	to { transform: rotate(360deg); }
@@ -317,54 +369,106 @@ body {
 {%- block page_content %}
 <div class="ca-page-wrapper">
 	<div class="ca-container">
-		<!-- Header -->
+		<!-- Header with University Logo -->
 		<div class="ca-header">
-			<div class="ca-logo-icon">🏛️</div>
-			<h1>شؤون المواطنين</h1>
-			<p>تقديم طلب أو استفسار إلى الجهة المعنية</p>
+			<img src="/assets/uotelafer_leave_management/logo.jpg" alt="جامعة تلعفر" class="ca-header-logo">
+			<h3>وزارة التعليم العالي والبحث العلمي - جامعة تلعفر</h3>
+			<h1>استمارة شؤون المواطنين (ش م)</h1>
+			<p>تقديم طلب أو استفسار رسمي إلى الكليات والأقسام المعنية</p>
 		</div>
 
 		<!-- Form Card -->
 		<div class="ca-card" id="ca-form-card">
 			<form id="ca-request-form" novalidate>
+				<div class="ca-section-title"><span>👤</span> البيانات الشخصية ومكان الإقامة</div>
+
 				<div class="ca-field">
-					<label><span class="ca-required">*</span> الاسم الكامل</label>
-					<input type="text" id="ca-full-name" placeholder="أدخل اسمك الكامل" required>
-					<div class="ca-error-msg">يرجى إدخال الاسم الكامل</div>
+					<label><span class="ca-required">*</span> الاسم الرباعي واللقب</label>
+					<input type="text" id="ca-full-name" placeholder="أدخل اسمك الرباعي الكامل كما في الهوية" required>
+					<div class="ca-error-msg">يرجى إدخال الاسم الرباعي</div>
+				</div>
+
+				<div class="ca-field-row">
+					<div class="ca-field">
+						<label><span class="ca-required">*</span> المحافظة / المدينة / القرية</label>
+						<input type="text" id="ca-address-area" placeholder="مثال: نينوى / تلعفر / حي السلام" required>
+						<div class="ca-error-msg">يرجى إدخال عنوان الإقامة</div>
+					</div>
+					<div class="ca-field">
+						<label><span class="ca-required">*</span> المهنة / الوظيفة</label>
+						<input type="text" id="ca-occupation" placeholder="مثال: موظف / طالب / كاسب / متقاعد" required>
+						<div class="ca-error-msg">يرجى إدخال المهنة</div>
+					</div>
 				</div>
 
 				<div class="ca-field-row">
 					<div class="ca-field">
 						<label><span class="ca-required">*</span> رقم الهاتف</label>
-						<input type="tel" id="ca-phone" placeholder="07XXXXXXXX" required>
-						<div class="ca-error-msg">يرجى إدخال رقم الهاتف</div>
+						<input type="tel" id="ca-phone" placeholder="07XXXXXXXXX" required>
+						<div class="ca-error-msg">يرجى إدخال رقم الهاتف الفعال</div>
 					</div>
 					<div class="ca-field">
 						<label><span class="ca-required">*</span> البريد الإلكتروني</label>
 						<input type="email" id="ca-email" placeholder="example@email.com" required>
-						<div class="ca-error-msg">يرجى إدخال بريد إلكتروني صحيح</div>
+						<div class="ca-error-msg">يرجى إدخال بريد إلكتروني صحيح للرد عليكم</div>
 					</div>
 				</div>
 
+				<div class="ca-section-title"><span>🏛️</span> الوجهة والموضوع</div>
+
 				<div class="ca-field">
-					<label><span class="ca-required">*</span> الجهة المعنية</label>
+					<label><span class="ca-required">*</span> الجهة التي ورد إليها الطلب (الكلية / القسم المعني)</label>
 					<select id="ca-department" required>
-						<option value="">-- اختر الجهة المعنية --</option>
+						<option value="">-- اختر الجهة أو الكلية المعنية --</option>
 						{% for dept in departments %}
 						<option value="{{ dept.name }}">{{ dept.department_name or dept.name }}</option>
 						{% endfor %}
 					</select>
-					<div class="ca-error-msg">يرجى اختيار الجهة المعنية</div>
+					<div class="ca-error-msg">يرجى اختيار الجهة المعنية بالطلب</div>
+				</div>
+
+				<div class="ca-field">
+					<label><span class="ca-required">*</span> موضوع الطلب (م /)</label>
+					<input type="text" id="ca-subject" placeholder="عنوان مختصر لموضوع الطلب، مثال: طلب وثيقة تخرج / استفسار إداري" required>
+					<div class="ca-error-msg">يرجى إدخال موضوع الطلب</div>
 				</div>
 
 				<div class="ca-field">
 					<label><span class="ca-required">*</span> تفاصيل الطلب</label>
-					<textarea id="ca-details" placeholder="اكتب تفاصيل طلبك أو استفسارك هنا..." required></textarea>
-					<div class="ca-error-msg">يرجى إدخال تفاصيل الطلب</div>
+					<textarea id="ca-details" placeholder="اكتب تفاصيل طلبك أو شرح حالتك بوضوح وتفصيل كامل..." required></textarea>
+					<div class="ca-error-msg">يرجى إدخال تفاصيل وشرح الطلب</div>
+				</div>
+
+				<div class="ca-section-title"><span>📎</span> المرفقات (روابط أو أسماء الملفات الداعمة)</div>
+
+				<div class="ca-field-row">
+					<div class="ca-field">
+						<label>المرفق 1 (اختياري)</label>
+						<input type="text" id="ca-attachment-1" placeholder="وصف المرفق أو رابط المستند الداعم الأول">
+					</div>
+					<div class="ca-field">
+						<label>المرفق 2 (اختياري)</label>
+						<input type="text" id="ca-attachment-2" placeholder="وصف المرفق أو رابط المستند الداعم الثاني">
+					</div>
+				</div>
+
+				<div class="ca-section-title"><span>✍️</span> التعهد والتوقيع</div>
+
+				<div class="ca-pledge-box">
+					<label class="ca-pledge-label">
+						<input type="checkbox" id="ca-pledge" required checked>
+						<span>ألتزم بصحة المعلومات الواردة في هذا الطلب وأتحمل المسؤولية القانونية والإدارية كافة وعليه أوقع.</span>
+					</label>
+				</div>
+
+				<div class="ca-field">
+					<label><span class="ca-required">*</span> توقيع مقدم الطلب (اكتب اسمك الصريح كتوقيع إلكتروني)</label>
+					<input type="text" id="ca-signature-name" placeholder="الاسم الرباعي للموقع" required>
+					<div class="ca-error-msg">يرجى إدخال توقيع مقدم الطلب</div>
 				</div>
 
 				<button type="submit" class="ca-submit-btn" id="ca-submit-btn">
-					<span class="ca-btn-text">إرسال الطلب</span>
+					<span class="ca-btn-text">إرسال واستخراج رقم الطلب</span>
 					<span class="ca-spinner"></span>
 				</button>
 			</form>
@@ -373,8 +477,8 @@ body {
 		<!-- Success State -->
 		<div class="ca-card ca-success" id="ca-success-card">
 			<div class="ca-success-icon">✓</div>
-			<h2>تم إرسال طلبك بنجاح!</h2>
-			<p>شكراً لتواصلك. سيتم مراجعة طلبك من قبل الجهة المعنية والرد عليك عبر البريد الإلكتروني.</p>
+			<h2>تم تقديم طلبك بنجاح!</h2>
+			<p>تم تسجيل استمارة شؤون المواطنين الخاصة بك في نظام رئاسة جامعة تلعفر بشكل رسمي.<br>يرجى الاحتفاظ برقم الطلب أدناه لمتابعة حالة الطلب عند المراجعة أو عبر البريد الإلكتروني.</p>
 			<div class="ca-success-ref" id="ca-ref-number"></div>
 			<br>
 			<button class="ca-new-request-btn" id="ca-new-request-btn">
@@ -392,6 +496,19 @@ body {
 	const successCard = document.getElementById('ca-success-card');
 	const newRequestBtn = document.getElementById('ca-new-request-btn');
 	const refNumber = document.getElementById('ca-ref-number');
+	const fullNameInput = document.getElementById('ca-full-name');
+	const signatureInput = document.getElementById('ca-signature-name');
+
+	// Auto-fill signature with full name if empty or matching
+	fullNameInput.addEventListener('input', function() {
+		if (!signatureInput.value || signatureInput.dataset.autofilled === "true") {
+			signatureInput.value = fullNameInput.value;
+			signatureInput.dataset.autofilled = "true";
+		}
+	});
+	signatureInput.addEventListener('input', function() {
+		signatureInput.dataset.autofilled = "false";
+	});
 
 	// Remove error state on input
 	document.querySelectorAll('.ca-field input, .ca-field select, .ca-field textarea').forEach(el => {
@@ -407,29 +524,27 @@ body {
 		let valid = true;
 
 		const fullName = document.getElementById('ca-full-name');
+		const addressArea = document.getElementById('ca-address-area');
+		const occupation = document.getElementById('ca-occupation');
 		const phone = document.getElementById('ca-phone');
 		const email = document.getElementById('ca-email');
 		const dept = document.getElementById('ca-department');
+		const subject = document.getElementById('ca-subject');
 		const details = document.getElementById('ca-details');
+		const pledge = document.getElementById('ca-pledge');
+		const signature = document.getElementById('ca-signature-name');
 
-		if (!fullName.value.trim()) {
-			fullName.closest('.ca-field').classList.add('error');
-			valid = false;
-		}
-		if (!phone.value.trim()) {
-			phone.closest('.ca-field').classList.add('error');
-			valid = false;
-		}
-		if (!email.value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
-			email.closest('.ca-field').classList.add('error');
-			valid = false;
-		}
-		if (!dept.value) {
-			dept.closest('.ca-field').classList.add('error');
-			valid = false;
-		}
-		if (!details.value.trim()) {
-			details.closest('.ca-field').classList.add('error');
+		if (!fullName.value.trim()) { fullName.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!addressArea.value.trim()) { addressArea.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!occupation.value.trim()) { occupation.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!phone.value.trim()) { phone.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!email.value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) { email.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!dept.value) { dept.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!subject.value.trim()) { subject.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!details.value.trim()) { details.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!signature.value.trim()) { signature.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!pledge.checked) {
+			alert('يجب الموافقة على التعهد الإداري بصحة المعلومات قبل إرسال الطلب.');
 			valid = false;
 		}
 
@@ -452,19 +567,27 @@ body {
 				},
 				body: JSON.stringify({
 					full_name: document.getElementById('ca-full-name').value.trim(),
+					address_area: document.getElementById('ca-address-area').value.trim(),
+					occupation: document.getElementById('ca-occupation').value.trim(),
 					target_department: document.getElementById('ca-department').value,
+					request_subject: document.getElementById('ca-subject').value.trim(),
 					request_details: document.getElementById('ca-details').value.trim(),
 					phone_number: document.getElementById('ca-phone').value.trim(),
-					email: document.getElementById('ca-email').value.trim()
+					email: document.getElementById('ca-email').value.trim(),
+					applicant_pledge: document.getElementById('ca-pledge').checked ? 1 : 0,
+					applicant_signature_name: document.getElementById('ca-signature-name').value.trim(),
+					attachment_1: document.getElementById('ca-attachment-1').value.trim(),
+					attachment_2: document.getElementById('ca-attachment-2').value.trim()
 				})
 			});
 
 			const data = await response.json();
 
 			if (data.message && data.message.success) {
-				refNumber.textContent = 'رقم الطلب: ' + data.message.name;
+				refNumber.textContent = 'رقم الطلب الرسمي: ' + data.message.name;
 				formCard.style.display = 'none';
 				successCard.style.display = 'block';
+				window.scrollTo({ top: 0, behavior: 'smooth' });
 			} else {
 				let errMsg = 'حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى.';
 				if (data._server_messages) {
@@ -479,7 +602,7 @@ body {
 				alert(errMsg);
 			}
 		} catch (error) {
-			alert('حدث خطأ في الاتصال. يرجى المحاولة مرة أخرى.');
+			alert('حدث خطأ في الاتصال بالسيرفر. يرجى المحاولة مرة أخرى.');
 			console.error(error);
 		} finally {
 			submitBtn.classList.remove('loading');

@@ -74,7 +74,7 @@ class LeaveSettings(Document):
 
 		page = frappe.get_doc("Page", "citizens-affairs-mgm")
 
-		roles = ["System Manager"]
+		roles = ["System Manager", "Citizen Affairs Manager"]
 
 		# Add all approval-level roles (they may need access to citizen affairs)
 		for level in self.approval_levels or []:

@@ -7,14 +7,34 @@
  "field_order": [
   "request_info_section",
   "full_name",
+  "address_area",
+  "occupation",
   "phone_number",
   "email",
   "column_break_info",
   "target_department",
-  "status",
   "creation_date",
+  "status",
+  "decision",
+  "attachments_section",
+  "attachment_1",
+  "attachment_2",
   "request_details_section",
+  "request_subject",
   "request_details",
+  "applicant_signature_section",
+  "applicant_pledge",
+  "applicant_signature_name",
+  "applicant_submission_date",
+  "citizen_affairs_section",
+  "receiver_name",
+  "receiver_signature",
+  "receipt_date",
+  "column_break_ca",
+  "recommendation",
+  "rejection_reasons",
+  "ca_officer_name",
+  "ca_officer_date",
   "reply_section",
   "reply_text",
   "column_break_reply",
@@ -25,14 +45,24 @@
   {
    "fieldname": "request_info_section",
    "fieldtype": "Section Break",
-   "label": "معلومات الطلب"
+   "label": "معلومات مقدم الطلب"
   },
   {
    "fieldname": "full_name",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "الاسم الكامل",
+   "label": "الاسم الرباعي",
    "reqd": 1
+  },
+  {
+   "fieldname": "address_area",
+   "fieldtype": "Data",
+   "label": "المحافظة / المدينة / القرية"
+  },
+  {
+   "fieldname": "occupation",
+   "fieldtype": "Data",
+   "label": "المهنة"
   },
   {
    "fieldname": "phone_number",
@@ -58,29 +88,55 @@
    "fieldname": "target_department",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "الجهة المعنية",
+   "label": "الجهة التي ورد إليها الطلب",
    "options": "Leave Department",
    "reqd": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "creation_date",
+   "fieldtype": "Date",
+   "label": "تاريخ تقديم الطلب",
+   "read_only": 1
   },
   {
    "default": "Open",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
-   "label": "الحالة",
-   "options": "Open\nReplied\nClosed"
+   "label": "حالة الطلب",
+   "options": "Open\nAccepted\nRejected\nReplied\nClosed"
   },
   {
-   "default": "Today",
-   "fieldname": "creation_date",
-   "fieldtype": "Date",
-   "label": "تاريخ التقديم",
-   "read_only": 1
+   "fieldname": "decision",
+   "fieldtype": "Select",
+   "label": "القرار (قبول / رفض)",
+   "options": "\nقبول الطلب\nرفض الطلب"
+  },
+  {
+   "fieldname": "attachments_section",
+   "fieldtype": "Section Break",
+   "label": "المرفقات"
+  },
+  {
+   "fieldname": "attachment_1",
+   "fieldtype": "Attach",
+   "label": "المرفق 1"
+  },
+  {
+   "fieldname": "attachment_2",
+   "fieldtype": "Attach",
+   "label": "المرفق 2"
   },
   {
    "fieldname": "request_details_section",
    "fieldtype": "Section Break",
-   "label": "تفاصيل الطلب"
+   "label": "التفاصيل"
+  },
+  {
+   "fieldname": "request_subject",
+   "fieldtype": "Data",
+   "label": "م / (موضوع الطلب)"
   },
   {
    "fieldname": "request_details",
@@ -89,10 +145,79 @@
    "reqd": 1
   },
   {
-   "depends_on": "eval:doc.status=='Replied' || doc.status=='Closed'",
+   "fieldname": "applicant_signature_section",
+   "fieldtype": "Section Break",
+   "label": "تعهد وتوقيع مقدم الطلب"
+  },
+  {
+   "default": "1",
+   "fieldname": "applicant_pledge",
+   "fieldtype": "Check",
+   "label": "ألتزم بصحة المعلومات الواردة في الطلب وأتحمل المسؤولية كافة وعليه أوقع"
+  },
+  {
+   "fieldname": "applicant_signature_name",
+   "fieldtype": "Data",
+   "label": "توقيع مقدم الطلب (الاسم)"
+  },
+  {
+   "default": "Today",
+   "fieldname": "applicant_submission_date",
+   "fieldtype": "Date",
+   "label": "تاريخ التوقيع",
+   "read_only": 1
+  },
+  {
+   "fieldname": "citizen_affairs_section",
+   "fieldtype": "Section Break",
+   "label": "يملى من قبل شعبة شؤون المواطنين"
+  },
+  {
+   "fieldname": "receiver_name",
+   "fieldtype": "Data",
+   "label": "اسم مستلم الطلب"
+  },
+  {
+   "fieldname": "receiver_signature",
+   "fieldtype": "Data",
+   "label": "توقيع مستلم الطلب"
+  },
+  {
+   "default": "Today",
+   "fieldname": "receipt_date",
+   "fieldtype": "Date",
+   "label": "تاريخ الاستلام"
+  },
+  {
+   "fieldname": "column_break_ca",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "recommendation",
+   "fieldtype": "Text",
+   "label": "التوصية"
+  },
+  {
+   "depends_on": "eval:doc.decision=='رفض الطلب' || doc.status=='Rejected'",
+   "fieldname": "rejection_reasons",
+   "fieldtype": "Text",
+   "label": "مبررات رفض الطلب"
+  },
+  {
+   "fieldname": "ca_officer_name",
+   "fieldtype": "Data",
+   "label": "مسؤول شعبة شؤون المواطنين"
+  },
+  {
+   "fieldname": "ca_officer_date",
+   "fieldtype": "Date",
+   "label": "تاريخ توقيع مسؤول الشعبة"
+  },
+  {
+   "depends_on": "eval:doc.status=='Replied' || doc.status=='Accepted' || doc.status=='Rejected' || doc.status=='Closed'",
    "fieldname": "reply_section",
    "fieldtype": "Section Break",
-   "label": "الرد"
+   "label": "الرد للمواطن"
   },
   {
    "fieldname": "reply_text",
@@ -120,7 +245,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-25 11:20:22.461554",
+ "modified": "2026-07-09 12:30:00.000000",
  "modified_by": "Administrator",
  "module": "Citizen Affairs",
  "name": "Citizens Affairs Request",
@@ -140,6 +265,18 @@
   },
   {
    "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Citizen Affairs Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
    "role": "Guest"
   },
   {
@@ -150,9 +287,9 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
+ "show_title_field_in_link": 1,
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],
- "title_field": "full_name",
- "show_title_field_in_link": 1
+ "title_field": "full_name"
 }
