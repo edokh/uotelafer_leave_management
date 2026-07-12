@@ -148,14 +148,33 @@ def _is_same_approval_scope(source_department, target_department):
     return bool(source_formation and source_formation == target_formation)
 
 
+def _should_limit_user_to_direct_departments(user):
+    """Department Head should be restricted to their directly mapped departments."""
+    roles = set(frappe.get_roles(user))
+    has_department_head_role = "Department Head" in roles
+    has_global_approval_role = (
+        "System Manager" in roles
+        or "University President" in roles
+        or "University Presedent" in roles
+    )
+    return has_department_head_role and not has_global_approval_role
+
+
 def _user_can_approve_level_for_department(user, department, approval_level):
     """Return True when the user can approve the target level for the leave department."""
     if not user or not department or not approval_level:
         return False
 
+    direct_department_only = _should_limit_user_to_direct_departments(user)
+
     for info in _get_user_approver_info(user):
         if info.get("approval_level") != approval_level:
             continue
+        if direct_department_only:
+            if info.get("department") == department:
+                return True
+            continue
+
         if _is_same_approval_scope(info.get("department"), department):
             return True
 
@@ -348,10 +367,13 @@ def get_pending_approval_leaves(from_date=None, to_date=None, leave_type=None, s
         )
         return _annotate_next_approval_levels(leaves)
 
+    direct_department_only = _should_limit_user_to_direct_departments(user)
+
     for info in approver_info:
         dept = info["department"]
         level = info["approval_level"]
-        for scoped_dept in _get_scope_departments_for_approval(dept):
+        scoped_departments = [dept] if direct_department_only else _get_scope_departments_for_approval(dept)
+        for scoped_dept in scoped_departments:
             if scoped_dept not in dept_level_map:
                 dept_level_map[scoped_dept] = set()
             dept_level_map[scoped_dept].add(level)
