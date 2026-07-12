@@ -2,6 +2,24 @@ import frappe
 from frappe.utils import today
 import json
 
+
+def _get_allowed_departments_for_user(user):
+    """Return visible departments for HR/Follow Up users; None means unrestricted."""
+    roles = frappe.get_roles(user)
+    if "System Manager" in roles:
+        return None
+
+    settings = frappe.get_cached_doc("Leave Settings")
+    visible_departments = []
+    for row in settings.department_visibility or []:
+        if row.user == user and row.department:
+            visible_departments.append(row.department)
+
+    if not visible_departments:
+        return None
+
+    return sorted(set(visible_departments))
+
 @frappe.whitelist()
 def get_data(filters=None):
     roles = frappe.get_roles(frappe.session.user)
@@ -17,29 +35,7 @@ def get_data(filters=None):
     if filters.get("user"):
         user_filters["name"] = filters.get("user")
 
-    # Formation-based access control (skip for System Manager)
-    allowed_departments = None
-    if "System Manager" not in frappe.get_roles(frappe.session.user):
-        current_le = frappe.get_value(
-            "Leave Employee", {"user": frappe.session.user}, ["leave_department"], as_dict=True
-        )
-        if current_le and current_le.leave_department:
-            formation = frappe.get_value(
-                "Leave Department", current_le.leave_department, "formation"
-            )
-            if formation:
-                dept_docs = frappe.get_all(
-                    "Leave Department",
-                    filters={"formation": formation},
-                    fields=["name"]
-                )
-                allowed_departments = [d.name for d in dept_docs]
-            else:
-                # Department exists but has no formation — only show own department
-                allowed_departments = [current_le.leave_department]
-        else:
-            # Current user has no Leave Employee record — show nothing
-            allowed_departments = []
+    allowed_departments = _get_allowed_departments_for_user(frappe.session.user)
 
     # users
     users = frappe.get_all("User", filters=user_filters, fields=["name", "full_name", "first_name", "middle_name", "last_name", "email"], order_by="name asc")
@@ -245,35 +241,13 @@ def get_accepted_leaves(filters=None):
     if filters.get("leave_department"):
         db_filters["dep"] = filters.get("leave_department")
 
-    # Formation-based access control (skip for System Manager)
-    if "System Manager" not in frappe.get_roles(frappe.session.user):
-        current_le = frappe.get_value(
-            "Leave Employee", {"user": frappe.session.user}, ["leave_department"], as_dict=True
-        )
-        if current_le and current_le.leave_department:
-            formation = frappe.get_value(
-                "Leave Department", current_le.leave_department, "formation"
-            )
-            if formation:
-                dept_docs = frappe.get_all(
-                    "Leave Department",
-                    filters={"formation": formation},
-                    fields=["name"]
-                )
-                allowed_departments = [d.name for d in dept_docs]
-                if filters.get("leave_department"):
-                    if filters.get("leave_department") not in allowed_departments:
-                        return []
-                else:
-                    db_filters["dep"] = ["in", allowed_departments]
-            else:
-                if filters.get("leave_department"):
-                    if filters.get("leave_department") != current_le.leave_department:
-                        return []
-                else:
-                    db_filters["dep"] = current_le.leave_department
+    allowed_departments = _get_allowed_departments_for_user(frappe.session.user)
+    if allowed_departments is not None:
+        if filters.get("leave_department"):
+            if filters.get("leave_department") not in allowed_departments:
+                return []
         else:
-            return []
+            db_filters["dep"] = ["in", allowed_departments]
 
     leaves = frappe.get_all(
         "Leave",
