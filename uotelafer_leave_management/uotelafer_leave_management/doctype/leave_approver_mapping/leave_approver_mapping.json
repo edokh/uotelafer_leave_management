@@ -32,11 +32,11 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "department",
+   "fieldname": "formation",
    "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Department",
-   "options": "Leave Department",
+   "label": "Formation",
+   "options": "Leave Formation",
    "reqd": 1
   },
   {

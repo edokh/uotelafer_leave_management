@@ -491,9 +491,9 @@ class LeaveManagementPage {
 
 	render_stats(data) {
 		let total = data.length;
-		let pending = data.filter(d => d.workflow_state === 'Pending' || d.workflow_state === 'Applied' || d.workflow_state === 'Approved By Department').length;
-		let approved = data.filter(d => d.workflow_state === 'Approved').length;
-		let rejected = data.filter(d => d.workflow_state === 'Rejected').length;
+		let pending = data.filter(d => d.status === 'Pending').length;
+		let approved = data.filter(d => d.status === 'Approved').length;
+		let rejected = data.filter(d => d.status === 'Rejected').length;
 
 		this.wrapper.find('#lm-stats-container').html(`
 			<div class="lm-stat-card total">
@@ -516,7 +516,7 @@ class LeaveManagementPage {
 	}
 
 	get_status_html(row) {
-		let state = row.workflow_state;
+		let state = row.status;
 		let cls = '';
 		let label = state;
 		let current_level = row.current_approval_level || 0;
@@ -585,9 +585,9 @@ class LeaveManagementPage {
 			let reason_text = row.reason ? (row.reason.length > 30 ? row.reason.substring(0, 30) + '...' : row.reason) : '-';
 
 			// Determine if this row needs approval action from the current user
-			let can_approve = this.current_tab === 'pending_approval' && (row.workflow_state === 'Applied' || row.workflow_state === 'Approved By Department');
-			let can_cancel = this.current_tab === 'my_leaves' && row.workflow_state === 'Approved' && row.to_date >= frappe.datetime.nowdate() && row.leave_type !== 'إلغاء إجازة';
-			let can_withdraw = (this.current_tab === 'my_leaves' || this.current_tab === 'proxy_leaves') && (row.workflow_state === 'Pending' || row.workflow_state === 'Applied');
+			let can_approve = this.current_tab === 'pending_approval' && row.status === 'Pending';
+			let can_cancel = this.current_tab === 'my_leaves' && row.status === 'Approved' && row.to_date >= frappe.datetime.nowdate() && row.leave_type !== 'إلغاء إجازة';
+			let can_withdraw = (this.current_tab === 'my_leaves' || this.current_tab === 'proxy_leaves') && (row.status === 'Draft' || row.status === 'Pending');
 
 			let checkbox_td = '';
 			if (this.current_tab === 'follow_up_leaves') {
@@ -909,7 +909,7 @@ class LeaveManagementPage {
 			return {
 				filters: {
 					employee: emp,
-					workflow_state: 'Approved'
+					status: 'Approved'
 				}
 			};
 		};
@@ -1008,7 +1008,7 @@ class LeaveManagementPage {
 	}
 
 	async show_details_dialog(row) {
-		let can_approve = this.current_tab === 'pending_approval' && (row.workflow_state === 'Applied' || row.workflow_state === 'Approved By Department');
+		let can_approve = this.current_tab === 'pending_approval' && row.status === 'Pending';
 
 		let r = await frappe.call({
 			method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_leave_comments',
@@ -1204,7 +1204,7 @@ class LeaveManagementPage {
 
 	apply_action(leave_name, action, comment, dialog) {
 		frappe.call({
-			method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.apply_workflow_action',
+			method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.process_leave_action',
 			args: {
 				leave_name: leave_name,
 				action: action,

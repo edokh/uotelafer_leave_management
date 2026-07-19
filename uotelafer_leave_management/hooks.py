@@ -18,18 +18,9 @@ fixtures = [
         "dt": "Workspace"
     },
     {
-        "dt": "Workflow"
-    },
-    {
         "dt": "Custom HTML Block",
         "filters": [["name", "=", "اضافة اجازة جديدة"]]
     },
-    {
-        "dt": "Workflow State"
-    },
-    {
-        "dt": "Workflow Action Master"
-    },    
     {
         "dt": "Leave Type"
     },

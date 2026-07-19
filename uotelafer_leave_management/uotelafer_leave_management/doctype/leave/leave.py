@@ -49,28 +49,40 @@ def get_permission_query_conditions(user):
     if "University Employee" in roles or "Leave Proxy Submitter" in roles:
         conditions.append(f"(`tabLeave`.employee = {frappe.db.escape(user)} OR `tabLeave`.owner = {frappe.db.escape(user)})")
 
-    # Approvers: check Leave Approver Mapping for departments this user can approve
+    # Approvers: check Leave Approver Mapping — resolve formations to departments
     settings = _get_settings()
-    approver_departments = set()
+    approver_formations = set()
     for mapping in settings.approver_mappings or []:
-        if mapping.user == user:
-            approver_departments.add(mapping.department)
+        if mapping.user == user and mapping.formation:
+            approver_formations.add(mapping.formation)
 
-    if approver_departments:
-        departments_str = ", ".join([frappe.db.escape(d) for d in approver_departments])
-        conditions.append(f"`tabLeave`.dep IN ({departments_str})")
+    if approver_formations:
+        approver_departments = frappe.get_all(
+            "Leave Department",
+            filters={"formation": ["in", list(approver_formations)]},
+            pluck="name",
+        )
+        if approver_departments:
+            departments_str = ", ".join([frappe.db.escape(d) for d in approver_departments])
+            conditions.append(f"`tabLeave`.dep IN ({departments_str})")
 
-    # Follow Up / HR: check department visibility
+    # Follow Up / HR: check formation-based visibility
     hr_role = settings.hr_employee_role or "HR Employee"
     if "Follow Up Employee" in roles or hr_role in roles:
-        visible_depts = []
+        visible_formations = set()
         for row in settings.department_visibility or []:
-            if row.user == user:
-                visible_depts.append(row.department)
+            if row.user == user and row.formation:
+                visible_formations.add(row.formation)
 
-        if visible_depts:
-            depts_str = ", ".join([frappe.db.escape(d) for d in visible_depts])
-            conditions.append(f"`tabLeave`.dep IN ({depts_str})")
+        if visible_formations:
+            visible_depts = frappe.get_all(
+                "Leave Department",
+                filters={"formation": ["in", list(visible_formations)]},
+                pluck="name",
+            )
+            if visible_depts:
+                depts_str = ", ".join([frappe.db.escape(d) for d in visible_depts])
+                conditions.append(f"`tabLeave`.dep IN ({depts_str})")
         else:
             # No visibility restrictions = see all
             return ""
@@ -98,11 +110,11 @@ class Leave(Document):
                 leave_employee.leave_department = self.dep
             leave_employee.save(ignore_permissions=True)
 
-        if self.workflow_state == "Rejected" or self.status == "Rejected":
+        if self.status == "Rejected":
             frappe.db.delete("Leave Balance Transaction", {"note": ["like", f"%{self.name}%"]})
 
     def on_update_after_submit(self):
-        if self.workflow_state == "Rejected" or self.status == "Rejected":
+        if self.status == "Rejected":
             frappe.db.delete("Leave Balance Transaction", {"note": ["like", f"%{self.name}%"]})
 
     def autoname(self):
@@ -137,8 +149,8 @@ class Leave(Document):
 
         if not self.is_new():
             old_doc = self.get_doc_before_save()
-            if old_doc and old_doc.workflow_state != self.workflow_state:
-                if self.workflow_state == "Approved":
+            if old_doc and old_doc.status != self.status:
+                if self.status == "Approved":
                     if not self.approved_by or self.approved_by == "Administrator":
                         u = frappe.session.user
                         self.approved_by = u
@@ -172,8 +184,8 @@ class Leave(Document):
                 frappe.throw(_("The original leave must belong to the same employee."))
 
             # Validate original leave is approved
-            if original_leave_doc.workflow_state != "Approved":
-                frappe.throw(_("Only approved leaves can be cancelled. The original leave is currently {0}.").format(original_leave_doc.workflow_state))
+            if original_leave_doc.status != "Approved":
+                frappe.throw(_("Only approved leaves can be cancelled. The original leave is currently {0}.").format(original_leave_doc.status))
 
             # Validate cancellation dates fall within original leave dates
             from frappe.utils import getdate
@@ -194,7 +206,7 @@ class Leave(Document):
                 filters={
                     "original_leave": self.original_leave,
                     "name": ["!=", self.name],
-                    "workflow_state": ["!=", "Rejected"],
+                    "status": ["!=", "Rejected"],
                     "from_date": ["<=", self.to_date],
                     "to_date": [">=", self.from_date]
                 }
@@ -227,11 +239,11 @@ class Leave(Document):
 
     def before_submit(self):
         """Validate that status is not Rejected before submission"""
-        if self.status == "Rejected" or self.workflow_state == "Rejected":
+        if self.status == "Rejected":
             frappe.throw(_("Cannot submit a Rejected leave request"))
 
     def on_submit(self):
-        if self.status == "Rejected" or self.workflow_state == "Rejected":
+        if self.status == "Rejected":
             return
 
         """Create a Leave Balance Transaction after submission"""
@@ -296,20 +308,26 @@ def get_all_leave_balances(employee, current_leave_name=None):
         hr_role = settings.hr_employee_role or "HR Employee"
         
         if hr_role not in roles and "Follow Up Employee" not in roles:
-            # Check if user is an approver for the employee's department
+            # Check if user is an approver for the employee's department (via formation)
             is_authorized = False
             emp_dep = frappe.db.get_value("Leave Employee", {"user": employee}, "leave_department")
+            emp_formation = None
             if emp_dep:
+                emp_formation = frappe.db.get_value("Leave Department", emp_dep, "formation")
+            if emp_formation:
                 for mapping in settings.approver_mappings or []:
-                    if mapping.user == user and mapping.department == emp_dep:
+                    if mapping.user == user and mapping.formation == emp_formation:
                         is_authorized = True
                         break
             
             if not is_authorized and current_leave_name:
                 leave_dep = frappe.db.get_value("Leave", current_leave_name, "dep")
+                leave_formation = None
                 if leave_dep:
+                    leave_formation = frappe.db.get_value("Leave Department", leave_dep, "formation")
+                if leave_formation:
                     for mapping in settings.approver_mappings or []:
-                        if mapping.user == user and mapping.department == leave_dep:
+                        if mapping.user == user and mapping.formation == leave_formation:
                             is_authorized = True
                             break
 
@@ -353,14 +371,13 @@ def get_all_leave_balances(employee, current_leave_name=None):
         leave_applications = frappe.get_all(
             "Leave",
             filters=filters,
-            fields=["days", "status", "workflow_state", "name", "is_time_leave", "number_of_hours"]
+            fields=["days", "status", "name", "is_time_leave", "number_of_hours"]
         )
 
         taken_days = 0
         for application in leave_applications:
             status = application.get("status")
-            workflow_state = application.get("workflow_state")
-            if status != "Rejected" and workflow_state != "Rejected":
+            if status != "Rejected":
                 if application.get("is_time_leave"):
                     taken_days += (application.get("number_of_hours", 0) / 7.0)
                 else:
@@ -399,17 +416,23 @@ def get_leave_balance(employee, leave_type, current_leave_name=None):
         if hr_role not in roles and "Follow Up Employee" not in roles:
             is_authorized = False
             emp_dep = frappe.db.get_value("Leave Employee", {"user": employee}, "leave_department")
+            emp_formation = None
             if emp_dep:
+                emp_formation = frappe.db.get_value("Leave Department", emp_dep, "formation")
+            if emp_formation:
                 for mapping in settings.approver_mappings or []:
-                    if mapping.user == user and mapping.department == emp_dep:
+                    if mapping.user == user and mapping.formation == emp_formation:
                         is_authorized = True
                         break
 
             if not is_authorized and current_leave_name:
                 leave_dep = frappe.db.get_value("Leave", current_leave_name, "dep")
+                leave_formation = None
                 if leave_dep:
+                    leave_formation = frappe.db.get_value("Leave Department", leave_dep, "formation")
+                if leave_formation:
                     for mapping in settings.approver_mappings or []:
-                        if mapping.user == user and mapping.department == leave_dep:
+                        if mapping.user == user and mapping.formation == leave_formation:
                             is_authorized = True
                             break
 
@@ -446,14 +469,13 @@ def get_leave_balance(employee, leave_type, current_leave_name=None):
     leave_applications = frappe.get_all(
         "Leave",
         filters=filters,
-        fields=["days", "status", "workflow_state", "is_time_leave", "number_of_hours"]
+        fields=["days", "status", "is_time_leave", "number_of_hours"]
     )
 
     taken_days = 0
     for application in leave_applications:
         status = application.get("status")
-        workflow_state = application.get("workflow_state")
-        if status != "Rejected" and workflow_state != "Rejected":
+        if status != "Rejected":
             if application.get("is_time_leave"):
                 taken_days += (application.get("number_of_hours", 0) / 7.0)
             else:
@@ -523,7 +545,7 @@ def check_overlapping_leaves(employee, from_date, to_date, exclude_leave_name=No
         filters={
             "employee": employee,
             "name": ["!=", exclude_leave_name] if exclude_leave_name else None,
-            "workflow_state": ["!=", "Rejected"],
+            "status": ["!=", "Rejected"],
             "from_date": ["<=", to_date],
             "to_date": [">=", from_date]
         },
@@ -551,7 +573,7 @@ def check_overlapping_leaves(employee, from_date, to_date, exclude_leave_name=No
         filters={
             "employee": employee,
             "leave_type": "إلغاء إجازة",
-            "workflow_state": ["!=", "Rejected"]
+            "status": ["!=", "Rejected"]
         },
         fields=["from_date", "to_date"]
     )

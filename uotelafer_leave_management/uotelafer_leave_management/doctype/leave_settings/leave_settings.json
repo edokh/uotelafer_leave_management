@@ -41,7 +41,7 @@
    "label": "Approver Mappings"
   },
   {
-   "description": "Map users to the departments they can approve and at which level. A user can approve multiple departments at the same level.",
+   "description": "Map users to the formations they can approve and at which level. A user can approve all departments in a formation at the same level.",
    "fieldname": "approver_mappings",
    "fieldtype": "Table",
    "label": "Approver Mappings",
@@ -50,13 +50,13 @@
   {
    "fieldname": "department_visibility_section",
    "fieldtype": "Section Break",
-   "label": "Department Visibility (Follow Up / HR)"
+   "label": "Formation Visibility (Follow Up / HR)"
   },
   {
-   "description": "Control which departments Follow Up and HR users can see. If a user has no entries here, they see ALL departments.",
+   "description": "Control which formations Follow Up and HR users can see. If a user has no entries here, they see ALL departments.",
    "fieldname": "department_visibility",
    "fieldtype": "Table",
-   "label": "Department Visibility",
+   "label": "Formation Visibility",
    "options": "Leave Department Visibility"
   },
   {

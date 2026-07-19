@@ -10,10 +10,19 @@ def _get_allowed_departments_for_user(user):
         return None
 
     settings = frappe.get_cached_doc("Leave Settings")
-    visible_departments = []
+    formations = set()
     for row in settings.department_visibility or []:
-        if row.user == user and row.department:
-            visible_departments.append(row.department)
+        if row.user == user and row.formation:
+            formations.add(row.formation)
+
+    if not formations:
+        return None
+
+    visible_departments = frappe.get_all(
+        "Leave Department",
+        filters={"formation": ["in", list(formations)]},
+        pluck="name",
+    )
 
     if not visible_departments:
         return None
@@ -233,7 +242,7 @@ def get_accepted_leaves(filters=None):
     else:
         filters = filters or {}
 
-    db_filters = {"workflow_state": "Approved"}
+    db_filters = {"status": "Approved"}
 
     if filters.get("user"):
         db_filters["employee"] = filters.get("user")

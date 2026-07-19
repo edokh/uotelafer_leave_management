@@ -138,6 +138,7 @@
    "options": "Leave"
   },
   {
+   "default": "Draft",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,

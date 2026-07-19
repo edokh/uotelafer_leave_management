@@ -81,26 +81,29 @@ def _get_scope_departments_for_approval(department):
 
 def _get_department_mapped_levels(department):
     """Return sorted unique approval levels configured for a department."""
+    formation = _get_department_formation(department)
+    if not formation:
+        return []
     settings = _get_settings()
     levels = {
         row.approval_level
         for row in (settings.approver_mappings or [])
-        if row.department == department and row.approval_level
+        if row.formation == formation and row.approval_level
     }
     return sorted(levels)
 
 
 def _get_scope_mapped_levels(department):
-    """Return approval levels available to a department's whole approval scope."""
-    scope_departments = set(_get_scope_departments_for_approval(department))
-    if not scope_departments:
+    """Return approval levels available to a department's formation."""
+    formation = _get_department_formation(department)
+    if not formation:
         return []
 
     settings = _get_settings()
     levels = {
         row.approval_level
         for row in (settings.approver_mappings or [])
-        if row.department in scope_departments and row.approval_level
+        if row.formation == formation and row.approval_level
     }
     return sorted(levels)
 
@@ -165,17 +168,26 @@ def _user_can_approve_level_for_department(user, department, approval_level):
     if not user or not department or not approval_level:
         return False
 
+    dept_formation = _get_department_formation(department)
+    if not dept_formation:
+        return False
+
     direct_department_only = _should_limit_user_to_direct_departments(user)
 
     for info in _get_user_approver_info(user):
         if info.get("approval_level") != approval_level:
             continue
+        mapped_formation = info.get("formation")
+        if not mapped_formation:
+            continue
+
         if direct_department_only:
-            if info.get("department") == department:
+            # Department Heads: check if the department belongs to the mapped formation
+            if mapped_formation == dept_formation:
                 return True
             continue
 
-        if _is_same_approval_scope(info.get("department"), department):
+        if mapped_formation == dept_formation:
             return True
 
     return False
@@ -217,17 +229,16 @@ def _resolve_employee_user(employee_value):
 
 def _get_user_approver_info(user):
     """
-    Return a list of dicts: [{department, approval_level}, ...]
-    for all departments/levels this user can approve.
+    Return a list of dicts: [{formation, approval_level}, ...]
+    for all formations/levels this user can approve.
     """
     settings = _get_settings()
-    roles = frappe.get_roles(user)
 
     results = []
     for mapping in settings.approver_mappings or []:
         if mapping.user == user:
             results.append({
-                "department": mapping.department,
+                "formation": mapping.formation,
                 "approval_level": mapping.approval_level
             })
 
@@ -237,44 +248,39 @@ def _get_user_approver_info(user):
 def _get_user_visible_departments(user):
     """
     Return list of department names that a Follow Up / HR user can see.
+    Resolves formation-based visibility entries to departments.
     If the user has no entries in department_visibility, they see ALL departments.
     """
     settings = _get_settings()
-    departments = []
+    formations = set()
     for row in settings.department_visibility or []:
-        if row.user == user:
-            departments.append(row.department)
-    return departments  # empty list = all departments
+        if row.user == user and row.formation:
+            formations.add(row.formation)
+
+    if not formations:
+        return []  # empty list = all departments
+
+    departments = frappe.get_all(
+        "Leave Department",
+        filters={"formation": ["in", list(formations)]},
+        pluck="name",
+    )
+    return departments
 
 
-def _get_workflow_state_for_level(current_level, max_level):
-    """Map the current approval level to a workflow state string."""
-    if current_level == 0:
-        return "Applied"
-    elif current_level >= max_level:
-        return "Approved"
-    else:
-        return "Approved By Department"
-
-
-def _get_workflow_display(workflow_state, current_level, max_level):
+def _get_status_display(status, current_level, max_level):
     """Get the display label for the current state, incorporating level info."""
-    if workflow_state == "Pending":
-        return "قيد الإنتظار"
-    elif workflow_state == "Applied":
-        next_level = 1
-        level_name = _get_level_name(next_level)
-        return f"بانتظار موافقة {level_name}"
-    elif workflow_state == "Rejected":
-        return "مرفوضة"
-    elif workflow_state == "Approved":
-        return "مقبولة"
-    elif workflow_state == "Approved By Department":
-        # Intermediate approval — show which level is next
+    if status == "Draft":
+        return "مسودة"
+    elif status == "Pending":
         next_level = (current_level or 0) + 1
         level_name = _get_level_name(next_level)
         return f"بانتظار موافقة {level_name}"
-    return workflow_state
+    elif status == "Rejected":
+        return "مرفوضة"
+    elif status == "Approved":
+        return "مقبولة"
+    return status
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -285,7 +291,7 @@ LEAVE_FIELDS = [
     "name", "employee", "employee_fullname", "dep",
     "leave_type", "original_leave", "from_date", "to_date", "days",
     "is_time_leave", "number_of_hours",
-    "reason", "workflow_state", "status",
+    "reason", "status",
     "date_of_application", "alternative_employee",
     "supervisor", "attachment", "personal_email",
     "current_approval_level", "max_required_level", "level_approvals"
@@ -306,8 +312,7 @@ def get_employee_leaves(from_date=None, to_date=None, leave_type=None, status=No
         filters["to_date"] = ["<=", to_date]
     if leave_type:
         filters["leave_type"] = leave_type
-    if status and status != "All":
-        filters["workflow_state"] = status
+        filters["status"] = status
 
     leaves = frappe.get_all(
         "Leave",
@@ -340,9 +345,9 @@ def get_pending_approval_leaves(from_date=None, to_date=None, leave_type=None, s
         # Admin sees all pending leaves
         all_filters = {}
         if status and status != "All":
-            all_filters["workflow_state"] = status
+            all_filters["status"] = status
         else:
-            all_filters["workflow_state"] = ["in", ["Applied", "Approved By Department"]]
+            all_filters["status"] = "Pending"
 
         if from_date:
             all_filters["from_date"] = [">=", from_date]
@@ -367,16 +372,20 @@ def get_pending_approval_leaves(from_date=None, to_date=None, leave_type=None, s
         )
         return _annotate_next_approval_levels(leaves)
 
-    direct_department_only = _should_limit_user_to_direct_departments(user)
-
     for info in approver_info:
-        dept = info["department"]
+        formation = info["formation"]
         level = info["approval_level"]
-        scoped_departments = [dept] if direct_department_only else _get_scope_departments_for_approval(dept)
-        for scoped_dept in scoped_departments:
-            if scoped_dept not in dept_level_map:
-                dept_level_map[scoped_dept] = set()
-            dept_level_map[scoped_dept].add(level)
+        if not formation:
+            continue
+        formation_departments = frappe.get_all(
+            "Leave Department",
+            filters={"formation": formation},
+            pluck="name",
+        )
+        for dept in formation_departments:
+            if dept not in dept_level_map:
+                dept_level_map[dept] = set()
+            dept_level_map[dept].add(level)
 
     if not dept_level_map:
         return []
@@ -386,9 +395,9 @@ def get_pending_approval_leaves(from_date=None, to_date=None, leave_type=None, s
 
     # Status filtering
     if status and status != "All":
-        filters["workflow_state"] = status
+        filters["status"] = status
     else:
-        filters["workflow_state"] = ["in", ["Applied", "Approved By Department"]]
+        filters["status"] = "Pending"
 
     # Date and leave type filtering
     if from_date:
@@ -429,7 +438,7 @@ def get_pending_approval_leaves(from_date=None, to_date=None, leave_type=None, s
     # If admin, also add leaves they haven't already covered
     if is_admin:
         existing_names = {l.name for l in leaves}
-        admin_filters = {"workflow_state": ["in", ["Applied", "Approved By Department"]]}
+        admin_filters = {"status": "Pending"}
         if from_date:
             admin_filters["from_date"] = [">=", from_date]
         if to_date:
@@ -472,13 +481,13 @@ def get_all_leaves(from_date=None, to_date=None, leave_type=None, status=None, d
         filters["leave_type"] = leave_type
 
     if status == "Submitted":
-        filters["workflow_state"] = ["in", ["Pending", "Applied", "Approved By Department"]]
+        filters["status"] = ["in", ["Draft", "Pending"]]
     elif status == "Approved":
-        filters["workflow_state"] = "Approved"
+        filters["status"] = "Approved"
     elif status:
-        filters["workflow_state"] = status
+        filters["status"] = status
     else:
-        filters["workflow_state"] = ["in", ["Pending", "Applied", "Approved By Department", "Approved"]]
+        filters["status"] = ["in", ["Draft", "Pending", "Approved"]]
 
     if dep:
         if "dep" in filters and isinstance(filters["dep"], list) and filters["dep"][0] == "in":
@@ -535,8 +544,7 @@ def get_proxy_leaves(from_date=None, to_date=None, leave_type=None, status=None,
         filters["to_date"] = ["<=", to_date]
     if leave_type:
         filters["leave_type"] = leave_type
-    if status and status != "All":
-        filters["workflow_state"] = status
+        filters["status"] = status
 
     leaves = frappe.get_all(
         "Leave",
@@ -571,8 +579,8 @@ def _append_action_log(doc, message, user=None):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
-def apply_workflow_action(leave_name, action, comment=None):
-    """Apply workflow action (Approve/Reject) with optional comment — multi-level aware."""
+def process_leave_action(leave_name, action, comment=None):
+    """Apply action (Approve/Reject/Apply) with optional comment — multi-level aware."""
     doc = frappe.get_doc("Leave", leave_name)
 
     if comment:
@@ -585,19 +593,17 @@ def apply_workflow_action(leave_name, action, comment=None):
     if action == "Apply":
         # Employee or proxy applying/re-applying leave
         can_apply = False
-        if doc.workflow_state in ["Pending", "Rejected"]:
+        if doc.status in ["Draft", "Pending", "Rejected"]:
             if user in [doc.employee, doc.owner] or "Leave Proxy Submitter" in roles or "HR Employee" in roles or is_admin:
                 can_apply = True
         if not can_apply:
-            frappe.throw(_("Access Denied or invalid workflow transition."))
+            frappe.throw(_("Access Denied or invalid transition."))
 
-        doc.workflow_state = "Applied"
         doc.status = "Pending"
         _append_action_log(doc, "تقديم الطلب للتدقيق", user)
         doc.flags.ignore_permissions = True
-        doc.flags.ignore_workflow_validation = True
         doc.save(ignore_permissions=True)
-        return {"status": "success", "new_state": doc.workflow_state}
+        return {"status": "success", "new_state": doc.status}
 
     if action not in ["Approve", "Reject"]:
         frappe.throw(_("Invalid action"))
@@ -643,18 +649,6 @@ def apply_workflow_action(leave_name, action, comment=None):
 
         if not upcoming_level or doc.current_approval_level >= (doc.max_required_level or 1):
             # Final approval
-            # When workflow requires an intermediate state for multi-level requests,
-            # pass through it internally before final approval to keep transitions valid.
-            if doc.workflow_state == "Applied" and (doc.max_required_level or 1) > 1:
-                doc.workflow_state = "Approved By Department"
-                doc.status = "Pending"
-                if not doc.date_of_supervisor_action:
-                    doc.date_of_supervisor_action = frappe.utils.today()
-                doc.flags.ignore_permissions = True
-                doc.flags.ignore_workflow_validation = True
-                doc.save(ignore_permissions=True)
-
-            doc.workflow_state = "Approved"
             doc.status = "Approved"
             doc.approved_by = user
             doc.approved_by_name = frappe.db.get_value("User", user, "full_name") or user
@@ -663,18 +657,13 @@ def apply_workflow_action(leave_name, action, comment=None):
             doc.date_of_presidant_action = frappe.utils.today()
             _append_action_log(doc, "الموافقة النهائية", user)
             doc.flags.ignore_permissions = True
-            doc.flags.ignore_workflow_validation = True
             doc.submit()
         else:
             # Intermediate approval — keep in intermediate state
             if next_level == 1:
-                doc.workflow_state = "Approved By Department"
                 doc.date_of_supervisor_action = frappe.utils.today()
-            else:
-                doc.workflow_state = "Approved By Department"
             doc.status = "Pending"
             doc.flags.ignore_permissions = True
-            doc.flags.ignore_workflow_validation = True
             doc.save(ignore_permissions=True)
 
     elif action == "Reject":
@@ -682,14 +671,12 @@ def apply_workflow_action(leave_name, action, comment=None):
             doc.date_of_supervisor_action = frappe.utils.today()
         else:
             doc.date_of_presidant_action = frappe.utils.today()
-        doc.workflow_state = "Rejected"
         doc.status = "Rejected"
         _append_action_log(doc, "رفض الطلب", user)
         doc.flags.ignore_permissions = True
-        doc.flags.ignore_workflow_validation = True
         doc.save(ignore_permissions=True)
 
-    return {"status": "success", "new_state": doc.workflow_state}
+    return {"status": "success", "new_state": doc.status}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -750,11 +737,17 @@ def get_leave_employees():
 
     allowed_departments = None
 
-    # Department approvers are limited to departments from approver mappings.
+    # Department approvers are limited to departments from approver mappings (resolved from formations).
     approver_info = _get_user_approver_info(user)
     if approver_info:
-        approver_departments = {row.get("department") for row in approver_info if row.get("department")}
-        allowed_departments = approver_departments
+        approver_formations = {row.get("formation") for row in approver_info if row.get("formation")}
+        if approver_formations:
+            approver_departments = set(frappe.get_all(
+                "Leave Department",
+                filters={"formation": ["in", list(approver_formations)]},
+                pluck="name",
+            ))
+            allowed_departments = approver_departments
 
     # Follow Up / HR visibility is applied as an additional restriction when configured.
     if hr_role in roles or "Follow Up Employee" in roles:
@@ -798,7 +791,7 @@ def get_user_roles():
     approval_departments = []
     for info in approver_info:
         approval_departments.append({
-            "department": info["department"],
+            "formation": info["formation"],
             "level": info["approval_level"],
             "level_name": _get_level_name(info["approval_level"])
         })
@@ -875,14 +868,12 @@ def create_leave(leave_type, from_date, to_date, reason, dep, employee=None, emp
     doc.current_approval_level = 0
     doc.max_required_level = 0  # Will be set in validate
 
-    doc.workflow_state = "Pending"
     doc.status = "Draft"
     _append_action_log(doc, "إنشاء طلب الإجازة", user)
     doc.insert()
 
     # Apply the "Apply" workflow action to move from Pending -> Applied
     try:
-        doc.workflow_state = "Applied"
         doc.status = "Pending"
         _append_action_log(doc, "تقديم الطلب للتدقيق", user)
         doc.flags.ignore_permissions = True
@@ -976,11 +967,12 @@ def remove_wrong_department_leave(leave_name):
     doc = frappe.get_doc("Leave", leave_name)
 
     if "System Manager" not in roles:
-        # Check if user is an approver for this department at the next required level
+        # Check if user is an approver for this department's formation
         approver_info = _get_user_approver_info(user)
+        dept_formation = _get_department_formation(doc.dep)
         authorized = False
         for info in approver_info:
-            if info["department"] == doc.dep:
+            if info["formation"] == dept_formation:
                 authorized = True
                 break
         if not authorized:
@@ -1004,7 +996,7 @@ def withdraw_leave(leave_name):
             frappe.throw(_("Access Denied: You can only withdraw your own leaves."))
 
     # Check state
-    if doc.workflow_state not in ["Pending", "Applied"]:
+    if doc.status not in ["Draft", "Pending"]:
         frappe.throw(_("You can only withdraw leaves that have not yet been approved by any level."))
 
     if doc.docstatus == 1:
@@ -1012,7 +1004,6 @@ def withdraw_leave(leave_name):
         doc.flags.ignore_workflow_validation = True
         doc.cancel()
 
-    frappe.db.set_value("Leave", leave_name, "workflow_state", "Rejected")
     frappe.db.set_value("Leave", leave_name, "status", "Rejected")
 
     current_log = frappe.db.get_value("Leave", leave_name, "action_log") or ""
