@@ -85,27 +85,20 @@ def _get_department_mapped_levels(department):
     if not formation:
         return []
     settings = _get_settings()
-    levels = {
-        row.approval_level
-        for row in (settings.approver_mappings or [])
-        if row.formation == formation and row.approval_level
-    }
+    levels = set()
+    for row in settings.approver_mappings or []:
+        if not row.approval_level:
+            continue
+        if row.get("department") and row.department == department:
+            levels.add(row.approval_level)
+        elif not row.get("department") and row.formation == formation:
+            levels.add(row.approval_level)
     return sorted(levels)
 
 
 def _get_scope_mapped_levels(department):
     """Return approval levels available to a department's formation."""
-    formation = _get_department_formation(department)
-    if not formation:
-        return []
-
-    settings = _get_settings()
-    levels = {
-        row.approval_level
-        for row in (settings.approver_mappings or [])
-        if row.formation == formation and row.approval_level
-    }
-    return sorted(levels)
+    return _get_department_mapped_levels(department)
 
 
 def _get_next_required_approval_level(department, current_level, max_required_level):
@@ -177,6 +170,13 @@ def _user_can_approve_level_for_department(user, department, approval_level):
     for info in _get_user_approver_info(user):
         if info.get("approval_level") != approval_level:
             continue
+            
+        mapped_dept = info.get("department")
+        if mapped_dept:
+            if mapped_dept == department:
+                return True
+            continue
+
         mapped_formation = info.get("formation")
         if not mapped_formation:
             continue
@@ -229,7 +229,7 @@ def _resolve_employee_user(employee_value):
 
 def _get_user_approver_info(user):
     """
-    Return a list of dicts: [{formation, approval_level}, ...]
+    Return a list of dicts: [{formation, department, approval_level}, ...]
     for all formations/levels this user can approve.
     """
     settings = _get_settings()
@@ -239,6 +239,7 @@ def _get_user_approver_info(user):
         if mapping.user == user:
             results.append({
                 "formation": mapping.formation,
+                "department": mapping.get("department"),
                 "approval_level": mapping.approval_level
             })
 
@@ -253,19 +254,27 @@ def _get_user_visible_departments(user):
     """
     settings = _get_settings()
     formations = set()
+    explicit_departments = set()
     for row in settings.department_visibility or []:
-        if row.user == user and row.formation:
-            formations.add(row.formation)
+        if row.user == user:
+            if row.get("department"):
+                explicit_departments.add(row.department)
+            elif row.formation:
+                formations.add(row.formation)
 
-    if not formations:
+    if not formations and not explicit_departments:
         return []  # empty list = all departments
 
-    departments = frappe.get_all(
-        "Leave Department",
-        filters={"formation": ["in", list(formations)]},
-        pluck="name",
-    )
-    return departments
+    allowed_departments = set(explicit_departments)
+    if formations:
+        departments = frappe.get_all(
+            "Leave Department",
+            filters={"formation": ["in", list(formations)]},
+            pluck="name",
+        )
+        allowed_departments.update(departments)
+        
+    return list(allowed_departments)
 
 
 def _get_status_display(status, current_level, max_level):

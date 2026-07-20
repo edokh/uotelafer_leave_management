@@ -52,37 +52,51 @@ def get_permission_query_conditions(user):
     # Approvers: check Leave Approver Mapping — resolve formations to departments
     settings = _get_settings()
     approver_formations = set()
+    approver_explicit_departments = set()
     for mapping in settings.approver_mappings or []:
-        if mapping.user == user and mapping.formation:
-            approver_formations.add(mapping.formation)
+        if mapping.user == user:
+            if mapping.get("department"):
+                approver_explicit_departments.add(mapping.department)
+            elif mapping.formation:
+                approver_formations.add(mapping.formation)
 
+    allowed_approver_departments = set(approver_explicit_departments)
     if approver_formations:
-        approver_departments = frappe.get_all(
+        formation_depts = frappe.get_all(
             "Leave Department",
             filters={"formation": ["in", list(approver_formations)]},
             pluck="name",
         )
-        if approver_departments:
-            departments_str = ", ".join([frappe.db.escape(d) for d in approver_departments])
-            conditions.append(f"`tabLeave`.dep IN ({departments_str})")
+        allowed_approver_departments.update(formation_depts)
+
+    if allowed_approver_departments:
+        departments_str = ", ".join([frappe.db.escape(d) for d in allowed_approver_departments])
+        conditions.append(f"`tabLeave`.dep IN ({departments_str})")
 
     # Follow Up / HR: check formation-based visibility
     hr_role = settings.hr_employee_role or "HR Employee"
     if "Follow Up Employee" in roles or hr_role in roles:
         visible_formations = set()
+        visible_explicit_departments = set()
         for row in settings.department_visibility or []:
-            if row.user == user and row.formation:
-                visible_formations.add(row.formation)
+            if row.user == user:
+                if row.get("department"):
+                    visible_explicit_departments.add(row.department)
+                elif row.formation:
+                    visible_formations.add(row.formation)
 
+        allowed_visible_departments = set(visible_explicit_departments)
         if visible_formations:
-            visible_depts = frappe.get_all(
+            formation_depts = frappe.get_all(
                 "Leave Department",
                 filters={"formation": ["in", list(visible_formations)]},
                 pluck="name",
             )
-            if visible_depts:
-                depts_str = ", ".join([frappe.db.escape(d) for d in visible_depts])
-                conditions.append(f"`tabLeave`.dep IN ({depts_str})")
+            allowed_visible_departments.update(formation_depts)
+
+        if allowed_visible_departments:
+            depts_str = ", ".join([frappe.db.escape(d) for d in allowed_visible_departments])
+            conditions.append(f"`tabLeave`.dep IN ({depts_str})")
         else:
             # No visibility restrictions = see all
             return ""
@@ -308,28 +322,36 @@ def get_all_leave_balances(employee, current_leave_name=None):
         hr_role = settings.hr_employee_role or "HR Employee"
         
         if hr_role not in roles and "Follow Up Employee" not in roles:
-            # Check if user is an approver for the employee's department (via formation)
+            # Check if user is an approver for the employee's department
             is_authorized = False
             emp_dep = frappe.db.get_value("Leave Employee", {"user": employee}, "leave_department")
             emp_formation = None
             if emp_dep:
                 emp_formation = frappe.db.get_value("Leave Department", emp_dep, "formation")
-            if emp_formation:
+            if emp_dep or emp_formation:
                 for mapping in settings.approver_mappings or []:
-                    if mapping.user == user and mapping.formation == emp_formation:
-                        is_authorized = True
-                        break
+                    if mapping.user == user:
+                        if mapping.get("department") and mapping.department == emp_dep:
+                            is_authorized = True
+                            break
+                        elif not mapping.get("department") and mapping.formation == emp_formation:
+                            is_authorized = True
+                            break
             
             if not is_authorized and current_leave_name:
                 leave_dep = frappe.db.get_value("Leave", current_leave_name, "dep")
                 leave_formation = None
                 if leave_dep:
                     leave_formation = frappe.db.get_value("Leave Department", leave_dep, "formation")
-                if leave_formation:
+                if leave_dep or leave_formation:
                     for mapping in settings.approver_mappings or []:
-                        if mapping.user == user and mapping.formation == leave_formation:
-                            is_authorized = True
-                            break
+                        if mapping.user == user:
+                            if mapping.get("department") and mapping.department == leave_dep:
+                                is_authorized = True
+                                break
+                            elif not mapping.get("department") and mapping.formation == leave_formation:
+                                is_authorized = True
+                                break
 
             if not is_authorized:
                 frappe.throw(_("Access Denied: You cannot view balances for this employee."))

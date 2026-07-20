@@ -7,6 +7,7 @@
   "user",
   "user_full_name",
   "column_break_1",
+  "formation",
   "department",
   "approval_level"
  ],
@@ -38,6 +39,13 @@
    "label": "Formation",
    "options": "Leave Formation",
    "reqd": 1
+  },
+  {
+   "fieldname": "department",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Department",
+   "options": "Leave Department"
   },
   {
    "description": "Which approval level this user approves at (must match a Level defined in Approval Levels table)",
