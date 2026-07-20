@@ -28,11 +28,25 @@ class CitizensAffairsRequest(Document):
 			return
 
 		dept = frappe.get_doc("Leave Department", self.target_department)
-		if not dept.department_head:
+		
+		emails = set()
+		try:
+			settings = frappe.get_cached_doc("Leave Settings")
+			for mapping in settings.approver_mappings or []:
+				if mapping.get("department") == self.target_department:
+					emails.add(mapping.user)
+				elif mapping.formation == dept.formation and not mapping.get("department"):
+					emails.add(mapping.user)
+		except Exception:
+			pass
+
+		if not emails and dept.department_head:
+			emails.add(dept.department_head)
+
+		if not emails:
 			return
 
-		head_email = dept.department_head
-		head_name = dept.department_head_name or dept.department_head
+		head_name = "مسؤول القسم"
 
 		subject = f"طلب جديد في شؤون المواطنين - {self.full_name} ({self.name})"
 		message = f"""
@@ -76,13 +90,13 @@ class CitizensAffairsRequest(Document):
 
 		try:
 			frappe.sendmail(
-				recipients=[head_email],
+				recipients=list(emails),
 				subject=subject,
 				message=message,
 				now=True
 			)
 		except Exception:
-			frappe.log_error(f"Failed to send citizen affairs notification to {head_email}")
+			frappe.log_error(f"Failed to send citizen affairs notification to {list(emails)}")
 
 
 @frappe.whitelist(allow_guest=True)
@@ -324,11 +338,7 @@ def get_department_requests(department=None, status=None, from_date=None, to_dat
 	"""Get requests for a specific department (for department head)."""
 	user = frappe.session.user
 
-	departments = frappe.get_all(
-		"Leave Department",
-		filters={"department_head": user},
-		pluck="name"
-	)
+	departments = _get_user_departments(user)
 
 	if not departments and not _is_citizen_affairs_admin():
 		frappe.throw(_("ليس لديك صلاحية للوصول إلى هذه الصفحة"))
@@ -336,8 +346,10 @@ def get_department_requests(department=None, status=None, from_date=None, to_dat
 	filters = {}
 
 	if department:
+		if not _is_citizen_affairs_admin() and department not in departments:
+			return []
 		filters["target_department"] = department
-	elif departments and not _is_citizen_affairs_admin():
+	elif departments:
 		filters["target_department"] = ["in", departments]
 
 	if status and status != "All":
@@ -419,11 +431,7 @@ def get_user_citizen_role():
 	user = frappe.session.user
 	roles = frappe.get_roles(user)
 
-	departments = frappe.get_all(
-		"Leave Department",
-		filters={"department_head": user},
-		pluck="name"
-	)
+	departments = _get_user_departments(user)
 
 	is_admin = _is_citizen_affairs_admin(user)
 
@@ -451,25 +459,44 @@ def _can_manage_request(doc):
 		return True
 	user = frappe.session.user
 	if doc.target_department:
-		dept_head = frappe.db.get_value("Leave Department", doc.target_department, "department_head")
-		if dept_head and dept_head == user:
+		approver_depts = _get_user_departments(user)
+		if doc.target_department in approver_depts:
 			return True
 	return False
 
 
 def _is_citizen_affairs_admin(user=None):
-	"""Check if user has the citizens affairs admin role defined in Leave Settings or is System Manager."""
+	"""Check if user has the citizens affairs manager role defined in Citizens Affairs Settings or is System Manager."""
 	if not user:
 		user = frappe.session.user
 	roles = frappe.get_roles(user)
 	if "System Manager" in roles:
 		return True
 	try:
-		settings = frappe.get_single("Leave Settings")
-		admin_role = settings.citizens_affairs_admin_role
+		settings = frappe.get_single("Citizens Affairs Settings")
+		admin_role = settings.citizens_affairs_manager
 		if admin_role and admin_role in roles:
 			return True
 	except Exception:
 		pass
 	return False
+
+def _get_user_departments(user):
+	departments = set()
+	try:
+		settings = frappe.get_cached_doc("Leave Settings")
+		for mapping in settings.approver_mappings or []:
+			if mapping.user == user:
+				if mapping.get("department"):
+					departments.add(mapping.department)
+				elif mapping.formation:
+					formation_depts = frappe.get_all(
+						"Leave Department",
+						filters={"formation": mapping.formation},
+						pluck="name"
+					)
+					departments.update(formation_depts)
+	except Exception:
+		pass
+	return list(departments)
 
