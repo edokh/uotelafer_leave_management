@@ -106,6 +106,67 @@ def get_permission_query_conditions(user):
 
     return f"(`tabLeave`.employee = {frappe.db.escape(user)} OR `tabLeave`.owner = {frappe.db.escape(user)})"
 
+def has_permission(doc, user=None, permission_type=None):
+    if not user:
+        user = frappe.session.user
+
+    roles = frappe.get_roles(user)
+    if "System Manager" in roles:
+        return True
+
+    if doc.employee == user or doc.owner == user:
+        return True
+
+    settings = _get_settings()
+    approver_formations = set()
+    approver_explicit_departments = set()
+    for mapping in settings.approver_mappings or []:
+        if mapping.user == user:
+            if mapping.get("department"):
+                approver_explicit_departments.add(mapping.department)
+            elif mapping.formation:
+                approver_formations.add(mapping.formation)
+
+    allowed_approver_departments = set(approver_explicit_departments)
+    if approver_formations:
+        formation_depts = frappe.get_all(
+            "Leave Department",
+            filters={"formation": ["in", list(approver_formations)]},
+            pluck="name",
+        )
+        allowed_approver_departments.update(formation_depts)
+
+    if doc.dep in allowed_approver_departments:
+        return True
+
+    hr_role = settings.hr_employee_role or "HR Employee"
+    if "Follow Up Employee" in roles or hr_role in roles:
+        visible_formations = set()
+        visible_explicit_departments = set()
+        for row in settings.department_visibility or []:
+            if row.user == user:
+                if row.get("department"):
+                    visible_explicit_departments.add(row.department)
+                elif row.formation:
+                    visible_formations.add(row.formation)
+
+        allowed_visible_departments = set(visible_explicit_departments)
+        if visible_formations:
+            formation_depts = frappe.get_all(
+                "Leave Department",
+                filters={"formation": ["in", list(visible_formations)]},
+                pluck="name",
+            )
+            allowed_visible_departments.update(formation_depts)
+
+        if allowed_visible_departments:
+            if doc.dep in allowed_visible_departments:
+                return True
+        else:
+            return True
+
+    return False
+
 
 class Leave(Document):
     def on_update(self):

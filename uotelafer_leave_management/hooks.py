@@ -5,8 +5,12 @@ app_description = "This app for managing the leaves of employees"
 app_email = "eido.khudyda@gmail.com"
 app_license = "mit"
 
-ppermission_query_conditions = {
+permission_query_conditions = {
     "Leave": "uotelafer_leave_management.uotelafer_leave_management.doctype.leave.leave.get_permission_query_conditions"
+}
+
+has_permission = {
+    "Leave": "uotelafer_leave_management.uotelafer_leave_management.doctype.leave.leave.has_permission"
 }
 
 fixtures = [
