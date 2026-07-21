@@ -383,18 +383,23 @@ def get_pending_approval_leaves(from_date=None, to_date=None, leave_type=None, s
 
     for info in approver_info:
         formation = info["formation"]
+        department = info.get("department")
         level = info["approval_level"]
-        if not formation:
-            continue
-        formation_departments = frappe.get_all(
-            "Leave Department",
-            filters={"formation": formation},
-            pluck="name",
-        )
-        for dept in formation_departments:
-            if dept not in dept_level_map:
-                dept_level_map[dept] = set()
-            dept_level_map[dept].add(level)
+        
+        if department:
+            if department not in dept_level_map:
+                dept_level_map[department] = set()
+            dept_level_map[department].add(level)
+        elif formation:
+            formation_departments = frappe.get_all(
+                "Leave Department",
+                filters={"formation": formation},
+                pluck="name",
+            )
+            for dept in formation_departments:
+                if dept not in dept_level_map:
+                    dept_level_map[dept] = set()
+                dept_level_map[dept].add(level)
 
     if not dept_level_map:
         return []
@@ -749,14 +754,23 @@ def get_leave_employees():
     # Department approvers are limited to departments from approver mappings (resolved from formations).
     approver_info = _get_user_approver_info(user)
     if approver_info:
-        approver_formations = {row.get("formation") for row in approver_info if row.get("formation")}
+        approver_departments = set()
+        approver_formations = set()
+        for row in approver_info:
+            if row.get("department"):
+                approver_departments.add(row.get("department"))
+            elif row.get("formation"):
+                approver_formations.add(row.get("formation"))
+
         if approver_formations:
-            approver_departments = set(frappe.get_all(
+            formation_depts = set(frappe.get_all(
                 "Leave Department",
                 filters={"formation": ["in", list(approver_formations)]},
                 pluck="name",
             ))
-            allowed_departments = approver_departments
+            approver_departments.update(formation_depts)
+            
+        allowed_departments = approver_departments
 
     # Follow Up / HR visibility is applied as an additional restriction when configured.
     if hr_role in roles or "Follow Up Employee" in roles:
@@ -801,6 +815,7 @@ def get_user_roles():
     for info in approver_info:
         approval_departments.append({
             "formation": info["formation"],
+            "department": info.get("department"),
             "level": info["approval_level"],
             "level_name": _get_level_name(info["approval_level"])
         })
@@ -981,7 +996,11 @@ def remove_wrong_department_leave(leave_name):
         dept_formation = _get_department_formation(doc.dep)
         authorized = False
         for info in approver_info:
-            if info["formation"] == dept_formation:
+            if info.get("department"):
+                if info.get("department") == doc.dep:
+                    authorized = True
+                    break
+            elif info.get("formation") == dept_formation:
                 authorized = True
                 break
         if not authorized:
