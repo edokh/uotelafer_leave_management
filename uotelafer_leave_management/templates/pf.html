@@ -1,14 +1,137 @@
 {%- set leave_type_name = frappe.db.get_value("Leave Type", doc.leave_type, "leave_type") if doc.leave_type else "" -%}
 {%- set dep_name = doc.dep or "" -%}
-{%- set supervisor_name = frappe.db.get_value("Leave Employee", {"user": doc.supervisor}, "full_name") if doc.supervisor else "" -%}
-{%- set qr_data_dict = { "id": doc.name, "emp": doc.employee_fullname or "", "type": leave_type_name or "", "from": doc.from_date|string, "to": doc.to_date|string, "days": doc.days|string, "status": doc.workflow_state or "Pending" } -%}
-{%- set qr_data = qr_data_dict | json -%}
 {%- set comments = frappe.get_all("Comment", filters={"reference_doctype": "Leave", "reference_name": doc.name, "comment_type": "Comment"}, fields=["comment_by", "content", "creation", "comment_type"], order_by="creation asc") -%}
-{%- set ws = doc.workflow_state or "Pending" -%}
-{%- set s_done = ws in ['Approved By Department', 'Approved'] -%}
-{%- set s_fail = ws == 'Rejected' and not doc.date_of_presidant_action -%}
-{%- set p_done = ws == 'Approved' -%}
-{%- set p_fail = ws == 'Rejected' and doc.date_of_presidant_action -%}
+
+{%- set qr_data_dict = { "id": doc.name, "emp": doc.employee_fullname or "", "type": leave_type_name or doc.leave_type or "", "from": doc.from_date|string, "to": doc.to_date|string, "days": doc.days|string, "status": doc.status or "Pending" } -%}
+{%- set qr_data = qr_data_dict | json -%}
+
+{# --- Multi-Level & Single-Level Approval Data Processing --- #}
+{%- set level_log_raw = doc.level_approvals or "[]" -%}
+{%- set level_log = json.loads(level_log_raw) if level_log_raw else [] -%}
+
+{%- set approved_levels = {} -%}
+{%- for item in level_log -%}
+  {%- if item and item.get("level") -%}
+    {%- set _ = approved_levels.update({item.level: item}) -%}
+  {%- endif -%}
+{%- endfor -%}
+
+{%- set settings = frappe.get_cached_doc("Leave Settings") -%}
+{%- set configured_levels = settings.approval_levels or [] -%}
+
+{# Determine actual max_lvl (supports single-level approvals) #}
+{%- set ns_max = namespace(val=1) -%}
+{%- if doc.status == "Approved" -%}
+  {%- set highest_app_level = 0 -%}
+  {%- for item in level_log -%}
+    {%- if item and item.get("level") and item.level > highest_app_level -%}
+      {%- set highest_app_level = item.level -%}
+    {%- endif -%}
+  {%- endfor -%}
+  {%- if highest_app_level > 0 -%}
+    {%- set ns_max.val = highest_app_level -%}
+  {%- elif doc.current_approval_level and doc.current_approval_level > 0 -%}
+    {%- set ns_max.val = doc.current_approval_level -%}
+  {%- else -%}
+    {%- set ns_max.val = 1 -%}
+  {%- endif -%}
+{%- else -%}
+  {%- set dep_mapped_levels = [] -%}
+  {%- if doc.dep and settings.approver_mappings -%}
+    {%- set dep_formation = frappe.db.get_value("Leave Department", doc.dep, "formation") if doc.dep else None -%}
+    {%- for m in settings.approver_mappings -%}
+      {%- if m.approval_level -%}
+        {%- if m.department and m.department == doc.dep -%}
+          {%- set _ = dep_mapped_levels.append(m.approval_level) -%}
+        {%- elif not m.department and m.formation and dep_formation and m.formation == dep_formation -%}
+          {%- set _ = dep_mapped_levels.append(m.approval_level) -%}
+        {%- endif -%}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endif -%}
+
+  {%- if dep_mapped_levels -%}
+    {%- set doc_max = doc.max_required_level or 1 -%}
+    {%- set valid_levels = [] -%}
+    {%- for lvl in dep_mapped_levels -%}
+      {%- if lvl <= doc_max -%}
+        {%- set _ = valid_levels.append(lvl) -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- if valid_levels -%}
+      {%- set ns_max.val = valid_levels | max -%}
+    {%- else -%}
+      {%- set ns_max.val = dep_mapped_levels | max -%}
+    {%- endif -%}
+  {%- else -%}
+    {%- set ns_max.val = doc.max_required_level if (doc.max_required_level and doc.max_required_level > 0) else 1 -%}
+  {%- endif -%}
+{%- endif -%}
+
+{%- set max_lvl = ns_max.val -%}
+{%- set cur_lvl = doc.current_approval_level or 0 -%}
+
+{%- set steps = [] -%}
+{%- for l_num in range(1, max_lvl + 1) -%}
+  {# Determine Level Title #}
+  {%- set ns = namespace(title="") -%}
+  {%- if l_num in approved_levels and approved_levels[l_num].get("level_name") -%}
+    {%- set ns.title = approved_levels[l_num].level_name -%}
+  {%- else -%}
+    {%- for cl in configured_levels -%}
+      {%- if cl.level == l_num and cl.level_name -%}
+        {%- set ns.title = cl.level_name -%}
+      {%- endif -%}
+    {%- endfor -%}
+    {%- if not ns.title -%}
+      {%- if l_num == 1 -%}
+        {%- set ns.title = "رئيس القسم" -%}
+      {%- elif l_num == 2 and max_lvl == 2 -%}
+        {%- set ns.title = "رئيس الجامعة" -%}
+      {%- else -%}
+        {%- set ns.title = "المستوى " ~ l_num -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {# Determine Level Status, Approver Name & Date #}
+  {%- set is_done = false -%}
+  {%- set is_fail = false -%}
+  {%- set app_name = "" -%}
+  {%- set app_date = "" -%}
+
+  {%- if l_num in approved_levels -%}
+    {%- set is_done = true -%}
+    {%- set app_name = approved_levels[l_num].get("user_name") or approved_levels[l_num].get("user") or "" -%}
+    {%- set app_date = approved_levels[l_num].get("date") or "" -%}
+  {%- elif doc.status == "Approved" and cur_lvl >= l_num -%}
+    {%- set is_done = true -%}
+    {%- set app_name = doc.approved_by_name or (frappe.db.get_value("User", doc.approved_by, "full_name") if doc.approved_by else "") -%}
+    {%- set app_date = (doc.approved_on.strftime('%Y-%m-%d') if doc.approved_on else doc.date_of_presidant_action) or "" -%}
+  {%- elif doc.status == "Rejected" and (cur_lvl + 1 == l_num or (cur_lvl == 0 and l_num == 1)) -%}
+    {%- set is_fail = true -%}
+    {%- set app_date = doc.date_of_supervisor_action if l_num == 1 else (doc.date_of_presidant_action or "") -%}
+  {%- else -%}
+    {%- if l_num == 1 and doc.supervisor -%}
+      {%- set app_name = frappe.db.get_value("Leave Employee", {"user": doc.supervisor}, "full_name") or frappe.db.get_value("User", doc.supervisor, "full_name") or "" -%}
+      {%- set app_date = doc.date_of_supervisor_action or "" -%}
+    {%- endif -%}
+  {%- endif -%}
+
+  {%- set _ = steps.append({
+    "level": l_num,
+    "title": ns.title,
+    "is_done": is_done,
+    "is_fail": is_fail,
+    "approver_name": app_name,
+    "date": app_date
+  }) -%}
+{%- endfor -%}
+
+{%- set numerals = ['١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩', '١٠'] -%}
+{%- set total_timeline_steps = steps|length + 1 -%}
+{%- set col_width_pct = (100 / total_timeline_steps) | round(2) -%}
+{%- set line_offset_pct = (100 / (total_timeline_steps * 2)) | round(2) -%}
 
 <style>
   /* wkhtmltopdf-safe CSS — no flexbox, no grid, no variables, no ::before */
@@ -143,8 +266,6 @@
   .lp-timeline-line {
     position: absolute;
     top: 24px;
-    left: 16.66%;
-    right: 16.66%;
     height: 3px;
     background-color: #d0d7e0;
     z-index: 1;
@@ -158,7 +279,6 @@
   .lp-timeline-table td {
     text-align: center;
     vertical-align: top;
-    width: 33.33%;
   }
   .lp-dot {
     width: 30px;
@@ -219,11 +339,11 @@
   /* signatures */
   .lp-sig-table {
     margin-top: 20px;
-    border-spacing: 20px 0;
+    border-spacing: 15px 0;
     border-collapse: separate;
+    width: 100%;
   }
   .lp-sig-table td {
-    width: 50%;
     border: 1px solid #d0d7e0;
     vertical-align: top;
     background-color: #fff;
@@ -253,19 +373,6 @@
     display: inline-block;
     border-radius: 4px;
   }
-  .lp-digi-stamp-pres {
-    border-color: #2b6cb0;
-    color: #2b6cb0;
-  }
-  .lp-sig-ft {
-    font-size: 10px;
-    color: #6b7a8d;
-    padding: 8px 10px;
-    border-top: 1px dashed #e0e4ea;
-    text-align: right;
-    line-height: 1.6;
-    background-color: #fcfcfd;
-  }
 
   /* footer */
   .lp-foot {
@@ -290,7 +397,7 @@
               <img class="lp-logo" src="/assets/uotelafer_leave_management/logo.jpg">
             </td>
             <td style="padding-right: 10px;">
-              <div class="lp-univ-sub"> وزارة التعليم العالي</div>
+              <div class="lp-univ-sub">وزارة التعليم العالي</div>
               <div class="lp-univ-main">جامعة تلعفر</div>
             </td>
           </tr>
@@ -301,7 +408,7 @@
         <div class="lp-ref">{{ doc.name }}</div>
       </td>
       <td style="text-align: left; width: 35%;">
-        <img class="lp-qr-img" src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data={{ qr_data | urlencode }}">
+        <img class="lp-qr-img" src="{{ get_qr_code(qr_data) }}">
       </td>
     </tr>
   </table>
@@ -320,8 +427,17 @@
     <tr>
       <td class="lbl">نوع الإجازة</td>
       <td class="val"><span class="lp-tag">{{ leave_type_name or doc.leave_type or "" }}</span></td>
-      <td class="lbl divider-cell">عدد الأيام</td>
-      <td class="val"><span class="lp-days">{{ doc.days }}</span> يوم</td>
+      <td class="lbl divider-cell">مدة الإجازة</td>
+      <td class="val">
+        {% if doc.is_time_leave %}
+          <span class="lp-days">{{ doc.number_of_hours or 0 }}</span> ساعة 
+          {% if doc.from_time and doc.to_time %}
+            (من {{ doc.from_time }} إلى {{ doc.to_time }})
+          {% endif %}
+        {% else %}
+          <span class="lp-days">{{ doc.days or 0 }}</span> يوم
+        {% endif %}
+      </td>
     </tr>
     <tr>
       <td class="lbl">من تاريخ</td>
@@ -350,24 +466,30 @@
   <!-- ═══ WORKFLOW TIMELINE ═══ -->
   <div class="lp-sec"><span class="lp-sec-bar"></span> مراحل سير المعاملة</div>
   <div class="lp-timeline-wrapper">
-    <div class="lp-timeline-line"></div>
+    <div class="lp-timeline-line" style="left: {{ line_offset_pct }}%; right: {{ line_offset_pct }}%;"></div>
     <table class="lp-timeline-table">
       <tr>
-        <td>
+        <td style="width: {{ col_width_pct }}%;">
           <div class="lp-dot lp-dot-done">✓</div>
           <div class="lp-step-title">تقديم الطلب</div>
           <div class="lp-step-dt">{{ doc.date_of_application or (doc.creation.strftime('%Y-%m-%d') if doc.creation else "") }}</div>
         </td>
-        <td>
-          <div class="lp-dot {% if s_done %}lp-dot-done{% elif s_fail %}lp-dot-fail{% endif %}">{% if s_done %}✓{% elif s_fail %}✗{% else %}٢{% endif %}</div>
-          <div class="lp-step-title">رئيس القسم</div>
-          <div class="lp-step-dt">{{ doc.date_of_supervisor_action or "—" }}</div>
+        {% for step in steps %}
+        {% set step_idx = loop.index %}
+        <td style="width: {{ col_width_pct }}%;">
+          <div class="lp-dot {% if step.is_done %}lp-dot-done{% elif step.is_fail %}lp-dot-fail{% endif %}">
+            {%- if step.is_done -%}
+              ✓
+            {%- elif step.is_fail -%}
+              ✗
+            {%- else -%}
+              {{ numerals[step_idx] if step_idx < numerals|length else (step_idx + 1) }}
+            {%- endif -%}
+          </div>
+          <div class="lp-step-title">{{ step.title }}</div>
+          <div class="lp-step-dt">{{ step.date or "—" }}</div>
         </td>
-        <td>
-          <div class="lp-dot {% if p_done %}lp-dot-done{% elif p_fail %}lp-dot-fail{% endif %}">{% if p_done %}✓{% elif p_fail %}✗{% else %}٣{% endif %}</div>
-          <div class="lp-step-title">رئيس الجامعة</div>
-          <div class="lp-step-dt">{{ doc.date_of_presidant_action or "—" }}</div>
-        </td>
+        {% endfor %}
       </tr>
     </table>
   </div>
@@ -377,7 +499,7 @@
   <div class="lp-sec"><span class="lp-sec-bar"></span> ملاحظات وتعليقات</div>
   <table class="lp-cmt-table">
     {% for c in comments %}
-    {%- set commenter_name = frappe.db.get_value("Leave Employee", {"user": c.comment_by}, "full_name") if c.comment_by else "" -%}
+    {%- set commenter_name = frappe.db.get_value("Leave Employee", {"user": c.comment_by}, "full_name") or frappe.db.get_value("User", c.comment_by, "full_name") if c.comment_by else "" -%}
     <tr>
       <td style="width: 25%; background-color: #f9fafb;">
         <span class="lp-cmt-who">{{ commenter_name or "النظام" }}</span>
@@ -392,31 +514,26 @@
   {% endif %}
 
   <!-- ═══ SIGNATURES ═══ -->
-  <table class="lp-sig-table">
+  {%- set sig_count = steps|length -%}
+  {%- set sig_col_width_pct = 50 if sig_count == 1 else ((100 / sig_count) | round(2)) -%}
+  <table class="lp-sig-table" style="{% if sig_count == 1 %}width: 50%; margin: 20px auto 0 auto;{% endif %}">
     <tr>
-      <td>
-        <div class="lp-sig-hd">توقيع رئيس القسم</div>
+      {% for step in steps %}
+      <td style="width: {{ sig_col_width_pct }}%;">
+        <div class="lp-sig-hd">موافقة {{ step.title }}</div>
         <div class="lp-sig-bd">
-          {% if s_done %}
-          <span class="lp-digi-stamp-pres">معتمد إلكترونياً</span>
+          {% if step.is_done %}
+          <span class="lp-digi-stamp">معتمد إلكترونياً</span>
+          {% elif step.is_fail %}
+          <span class="lp-digi-stamp" style="border-color: #e53e3e; color: #e53e3e;">مرفوض</span>
           {% endif %}
         </div>
         <div class="lp-sig-ft">
-          الاسم: {{ supervisor_name or "—" }}<br>
-          التاريخ: {{ doc.date_of_supervisor_action or "—" }}
+          الاسم: {{ step.approver_name or "—" }}<br>
+          التاريخ: {{ step.date or "—" }}
         </div>
       </td>
-      <td>
-        <div class="lp-sig-hd">توقيع رئيس الجامعة</div>
-        <div class="lp-sig-bd">
-          {% if p_done %}
-          <span class="lp-digi-stamp lp-digi-stamp">معتمد الكترونياً</span>
-          {% endif %}
-        </div>
-        <div class="lp-sig-ft">
-          التاريخ: {{ doc.date_of_presidant_action or "—" }}
-        </div>
-      </td>
+      {% endfor %}
     </tr>
   </table>
 
