@@ -1,0 +1,25 @@
+{
+ "content": null,
+ "creation": "2026-06-25 11:24:50.335776",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-07-20 10:35:47.936798",
+ "modified_by": "Administrator",
+ "module": "Citizen Affairs",
+ "name": "citizens-affairs-mgm",
+ "owner": "Administrator",
+ "page_name": "citizens-affairs-mgm",
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "Department Head"
+  }
+ ],
+ "script": null,
+ "standard": "Yes",
+ "style": null,
+ "system_page": 0
+}

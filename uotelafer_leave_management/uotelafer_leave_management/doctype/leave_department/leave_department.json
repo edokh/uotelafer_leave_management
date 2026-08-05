@@ -8,9 +8,11 @@
  "engine": "InnoDB",
  "field_order": [
   "department_name",
+  "formation",
   "department_head",
   "department_head_name",
-  "department_head_personal_email"
+  "department_head_personal_email",
+  "accept_citzen_requests"
  ],
  "fields": [
   {
@@ -18,6 +20,14 @@
    "fieldtype": "Data",
    "label": "Department Name",
    "unique": 1
+  },
+  {
+   "fieldname": "formation",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Formation",
+   "options": "Leave Formation",
+   "reqd": 1
   },
   {
    "fieldname": "department_head",
@@ -36,11 +46,17 @@
    "fieldname": "department_head_personal_email",
    "fieldtype": "Data",
    "label": "Department Head Personal Email"
+  },
+  {
+   "default": "0",
+   "fieldname": "accept_citzen_requests",
+   "fieldtype": "Check",
+   "label": "Accept Citzen Requests"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-07 11:41:30.771851",
+ "modified": "2026-07-10 15:36:58.918085",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave Department",
@@ -64,6 +80,11 @@
    "role": "University Employee",
    "select": 1,
    "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Guest",
+   "select": 1
   }
  ],
  "row_format": "Dynamic",

@@ -8,7 +8,8 @@
  "field_order": [
   "user",
   "full_name",
-  "leave_department"
+  "leave_department",
+  "type"
  ],
  "fields": [
   {
@@ -34,13 +35,18 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Leave Department",
-   "options": "Leave Department",
-   "reqd": 1
+   "options": "Leave Department"
+  },
+  {
+   "fieldname": "type",
+   "fieldtype": "Select",
+   "label": "Type",
+   "options": "Employee\nTeaching Staff"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-05-07 10:34:41.238352",
+ "modified": "2026-06-21 09:55:59.710576",
  "modified_by": "Administrator",
  "module": "Uotelafer Leave Management",
  "name": "Leave Employee",

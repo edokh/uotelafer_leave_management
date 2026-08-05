@@ -1,0 +1,621 @@
+{%- block title %}استمارة شؤون المواطنين - جامعة تلعفر{% endblock -%}
+
+{%- block head_include %}
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ===== Citizen Affairs Request – Premium RTL Arabic UI ===== */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+	font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif;
+	direction: rtl;
+	min-height: 100vh;
+	background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+	color: #f8fafc;
+}
+
+.ca-page-wrapper {
+	min-height: 100vh;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 40px 20px;
+	position: relative;
+	overflow: hidden;
+}
+
+/* Animated background orbs */
+.ca-page-wrapper::before,
+.ca-page-wrapper::after {
+	content: '';
+	position: absolute;
+	border-radius: 50%;
+	filter: blur(100px);
+	opacity: 0.25;
+	animation: ca-float 8s ease-in-out infinite alternate;
+}
+.ca-page-wrapper::before {
+	width: 500px; height: 500px;
+	background: radial-gradient(circle, #2563eb, transparent);
+	top: -100px; right: -100px;
+}
+.ca-page-wrapper::after {
+	width: 400px; height: 400px;
+	background: radial-gradient(circle, #7c3aed, transparent);
+	bottom: -80px; left: -80px;
+	animation-delay: 4s;
+}
+
+.ca-container {
+	width: 100%;
+	max-width: 760px;
+	position: relative;
+	z-index: 1;
+}
+
+/* Header */
+.ca-header {
+	text-align: center;
+	margin-bottom: 32px;
+}
+.ca-header-logo {
+	width: 100px;
+	height: 100px;
+	border-radius: 20px;
+	object-fit: contain;
+	background: #fff;
+	padding: 6px;
+	box-shadow: 0 8px 32px rgba(37,99,235,.35);
+	margin-bottom: 16px;
+	animation: ca-pulse 3s ease-in-out infinite;
+}
+.ca-header h1 {
+	font-size: 30px;
+	font-weight: 900;
+	color: #f8fafc;
+	letter-spacing: -0.5px;
+	margin-bottom: 6px;
+}
+.ca-header h3 {
+	font-size: 18px;
+	font-weight: 700;
+	color: #60a5fa;
+	margin-bottom: 8px;
+}
+.ca-header p {
+	font-size: 15px;
+	color: #94a3b8;
+	font-weight: 500;
+}
+
+/* Card */
+.ca-card {
+	background: rgba(30, 41, 59, 0.75);
+	backdrop-filter: blur(20px);
+	-webkit-backdrop-filter: blur(20px);
+	border: 1px solid rgba(148, 163, 184, 0.16);
+	border-radius: 24px;
+	padding: 40px;
+	box-shadow: 0 20px 60px rgba(0,0,0,.35);
+}
+
+.ca-section-title {
+	font-size: 18px;
+	font-weight: 800;
+	color: #60a5fa;
+	border-bottom: 2px solid rgba(96, 165, 250, 0.2);
+	padding-bottom: 8px;
+	margin-top: 24px;
+	margin-bottom: 18px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.ca-section-title:first-of-type {
+	margin-top: 0;
+}
+
+/* Form Fields */
+.ca-field {
+	margin-bottom: 20px;
+}
+.ca-field label {
+	display: block;
+	font-size: 15px;
+	font-weight: 700;
+	color: #e2e8f0;
+	margin-bottom: 8px;
+}
+.ca-field label .ca-required {
+	color: #f87171;
+	margin-right: 4px;
+}
+.ca-field input[type="text"],
+.ca-field input[type="tel"],
+.ca-field input[type="email"],
+.ca-field select,
+.ca-field textarea {
+	width: 100%;
+	padding: 13px 16px;
+	border: 1.5px solid rgba(148, 163, 184, 0.25);
+	border-radius: 14px;
+	font-size: 15px;
+	font-family: inherit;
+	background: rgba(15, 23, 42, 0.65);
+	color: #f1f5f9;
+	transition: border-color .25s, box-shadow .25s, background .25s;
+	outline: none;
+}
+.ca-field input::placeholder,
+.ca-field textarea::placeholder {
+	color: #64748b;
+}
+.ca-field input:focus,
+.ca-field select:focus,
+.ca-field textarea:focus {
+	border-color: #3b82f6;
+	box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
+	background: rgba(15, 23, 42, 0.85);
+}
+.ca-field select {
+	-webkit-appearance: none;
+	appearance: none;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: left 16px center;
+	padding-left: 40px;
+}
+.ca-field select option {
+	background: #1e293b;
+	color: #f1f5f9;
+}
+.ca-field textarea {
+	min-height: 130px;
+	resize: vertical;
+	line-height: 1.8;
+}
+
+.ca-field-row {
+	display: flex;
+	gap: 16px;
+}
+.ca-field-row .ca-field {
+	flex: 1;
+}
+
+/* Pledge Box */
+.ca-pledge-box {
+	background: rgba(30, 58, 138, 0.25);
+	border: 1.5px solid rgba(96, 165, 250, 0.3);
+	border-radius: 14px;
+	padding: 18px;
+	margin-top: 10px;
+	margin-bottom: 24px;
+}
+.ca-pledge-label {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	cursor: pointer;
+	font-size: 15px;
+	font-weight: 700;
+	color: #f1f5f9;
+	line-height: 1.6;
+}
+.ca-pledge-label input[type="checkbox"] {
+	width: 20px;
+	height: 20px;
+	margin-top: 2px;
+	accent-color: #2563eb;
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+/* Error state */
+.ca-field.error input,
+.ca-field.error select,
+.ca-field.error textarea {
+	border-color: #ef4444;
+	box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.15);
+}
+.ca-field .ca-error-msg {
+	display: none;
+	font-size: 13px;
+	color: #f87171;
+	margin-top: 6px;
+	font-weight: 600;
+}
+.ca-field.error .ca-error-msg {
+	display: block;
+}
+
+/* Submit Button */
+.ca-submit-btn {
+	width: 100%;
+	padding: 16px 32px;
+	background: linear-gradient(135deg, #2563eb, #7c3aed);
+	color: #fff;
+	border: none;
+	border-radius: 16px;
+	font-size: 18px;
+	font-weight: 800;
+	font-family: inherit;
+	cursor: pointer;
+	box-shadow: 0 8px 32px rgba(37,99,235,.35);
+	transition: transform .2s, box-shadow .2s, opacity .2s;
+	margin-top: 10px;
+	position: relative;
+	overflow: hidden;
+}
+.ca-submit-btn:hover:not(:disabled) {
+	transform: translateY(-2px);
+	box-shadow: 0 12px 40px rgba(124,58,237,.45);
+}
+.ca-submit-btn:active:not(:disabled) {
+	transform: translateY(0);
+}
+.ca-submit-btn:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+.ca-submit-btn .ca-spinner {
+	display: none;
+	width: 22px; height: 22px;
+	border: 3px solid rgba(255,255,255,.3);
+	border-top-color: #fff;
+	border-radius: 50%;
+	animation: ca-spin 0.7s linear infinite;
+	margin: 0 auto;
+}
+.ca-submit-btn.loading .ca-btn-text { display: none; }
+.ca-submit-btn.loading .ca-spinner { display: inline-block; }
+
+/* Success State */
+.ca-success {
+	display: none;
+	text-align: center;
+	padding: 48px 32px;
+}
+.ca-success-icon {
+	width: 88px; height: 88px;
+	background: linear-gradient(135deg, #22c55e, #16a34a);
+	border-radius: 50%;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 44px;
+	margin-bottom: 24px;
+	box-shadow: 0 8px 32px rgba(34,197,94,.35);
+	animation: ca-bounce-in .5s ease;
+}
+.ca-success h2 {
+	font-size: 26px;
+	font-weight: 900;
+	color: #f8fafc;
+	margin-bottom: 12px;
+}
+.ca-success p {
+	font-size: 16px;
+	color: #94a3b8;
+	line-height: 1.8;
+	margin-bottom: 24px;
+}
+.ca-success-ref {
+	display: inline-block;
+	background: rgba(34, 197, 94, 0.15);
+	border: 1.5px solid rgba(34, 197, 94, 0.4);
+	color: #4ade80;
+	padding: 12px 28px;
+	border-radius: 14px;
+	font-size: 18px;
+	font-weight: 800;
+	margin-bottom: 24px;
+}
+.ca-new-request-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 12px 28px;
+	background: rgba(148, 163, 184, 0.1);
+	border: 1.5px solid rgba(148, 163, 184, 0.2);
+	color: #e2e8f0;
+	border-radius: 14px;
+	font-size: 16px;
+	font-weight: 700;
+	font-family: inherit;
+	cursor: pointer;
+	transition: background .2s, border-color .2s;
+}
+.ca-new-request-btn:hover {
+	background: rgba(148, 163, 184, 0.15);
+	border-color: rgba(148, 163, 184, 0.3);
+}
+
+/* Animations */
+@keyframes ca-float {
+	0% { transform: translate(0, 0) scale(1); }
+	100% { transform: translate(30px, -20px) scale(1.1); }
+}
+@keyframes ca-pulse {
+	0%, 100% { box-shadow: 0 8px 32px rgba(37,99,235,.35); }
+	50% { box-shadow: 0 8px 48px rgba(124,58,237,.45); }
+}
+@keyframes ca-spin {
+	to { transform: rotate(360deg); }
+}
+@keyframes ca-bounce-in {
+	0% { transform: scale(0); opacity: 0; }
+	60% { transform: scale(1.15); }
+	100% { transform: scale(1); opacity: 1; }
+}
+@keyframes ca-slide-up {
+	from { opacity: 0; transform: translateY(30px); }
+	to { opacity: 1; transform: translateY(0); }
+}
+
+.ca-card { animation: ca-slide-up .5s ease; }
+
+/* Responsive */
+@media (max-width: 640px) {
+	.ca-card { padding: 28px 20px; border-radius: 20px; }
+	.ca-header h1 { font-size: 26px; }
+	.ca-field-row { flex-direction: column; gap: 0; }
+	.ca-page-wrapper { padding: 24px 12px; }
+}
+</style>
+{%- endblock -%}
+
+{%- block page_content %}
+<div class="ca-page-wrapper">
+	<div class="ca-container">
+		<!-- Header with University Logo -->
+		<div class="ca-header">
+			<img src="/assets/uotelafer_leave_management/logo.jpg" alt="جامعة تلعفر" class="ca-header-logo">
+			<h3>وزارة التعليم العالي والبحث العلمي - جامعة تلعفر</h3>
+			<h1>استمارة شؤون المواطنين (ش م)</h1>
+			<p>تقديم طلب أو استفسار رسمي إلى الكليات والأقسام المعنية</p>
+		</div>
+
+		<!-- Form Card -->
+		<div class="ca-card" id="ca-form-card">
+			<form id="ca-request-form" novalidate>
+				<div class="ca-section-title"><span>👤</span> البيانات الشخصية ومكان الإقامة</div>
+
+				<div class="ca-field">
+					<label><span class="ca-required">*</span> الاسم الرباعي واللقب</label>
+					<input type="text" id="ca-full-name" placeholder="أدخل اسمك الرباعي الكامل كما في الهوية" required>
+					<div class="ca-error-msg">يرجى إدخال الاسم الرباعي</div>
+				</div>
+
+				<div class="ca-field-row">
+					<div class="ca-field">
+						<label><span class="ca-required">*</span> المحافظة / المدينة / القرية</label>
+						<input type="text" id="ca-address-area" placeholder="مثال: نينوى / تلعفر / حي السلام" required>
+						<div class="ca-error-msg">يرجى إدخال عنوان الإقامة</div>
+					</div>
+					<div class="ca-field">
+						<label><span class="ca-required">*</span> المهنة / الوظيفة</label>
+						<input type="text" id="ca-occupation" placeholder="مثال: موظف / طالب / كاسب / متقاعد" required>
+						<div class="ca-error-msg">يرجى إدخال المهنة</div>
+					</div>
+				</div>
+
+				<div class="ca-field-row">
+					<div class="ca-field">
+						<label><span class="ca-required">*</span> رقم الهاتف</label>
+						<input type="tel" id="ca-phone" placeholder="07XXXXXXXXX" required>
+						<div class="ca-error-msg">يرجى إدخال رقم الهاتف الفعال</div>
+					</div>
+					<div class="ca-field">
+						<label><span class="ca-required">*</span> البريد الإلكتروني</label>
+						<input type="email" id="ca-email" placeholder="example@email.com" required>
+						<div class="ca-error-msg">يرجى إدخال بريد إلكتروني صحيح للرد عليكم</div>
+					</div>
+				</div>
+
+				<div class="ca-section-title"><span>🏛️</span> الوجهة والموضوع</div>
+
+				<div class="ca-field">
+					<label><span class="ca-required">*</span> الجهة التي ورد إليها الطلب (الكلية / القسم المعني)</label>
+					<select id="ca-department" required>
+						<option value="">-- اختر الجهة أو الكلية المعنية --</option>
+						{% for dept in departments %}
+						<option value="{{ dept.name }}">{{ dept.department_name or dept.name }}</option>
+						{% endfor %}
+					</select>
+					<div class="ca-error-msg">يرجى اختيار الجهة المعنية بالطلب</div>
+				</div>
+
+				<div class="ca-field">
+					<label><span class="ca-required">*</span> موضوع الطلب (م /)</label>
+					<input type="text" id="ca-subject" placeholder="عنوان مختصر لموضوع الطلب، مثال: طلب وثيقة تخرج / استفسار إداري" required>
+					<div class="ca-error-msg">يرجى إدخال موضوع الطلب</div>
+				</div>
+
+				<div class="ca-field">
+					<label><span class="ca-required">*</span> تفاصيل الطلب</label>
+					<textarea id="ca-details" placeholder="اكتب تفاصيل طلبك أو شرح حالتك بوضوح وتفصيل كامل..." required></textarea>
+					<div class="ca-error-msg">يرجى إدخال تفاصيل وشرح الطلب</div>
+				</div>
+
+				<div class="ca-section-title"><span>📎</span> المرفقات (روابط أو أسماء الملفات الداعمة)</div>
+
+				<div class="ca-field-row">
+					<div class="ca-field">
+						<label>المرفق 1 (اختياري)</label>
+						<input type="text" id="ca-attachment-1" placeholder="وصف المرفق أو رابط المستند الداعم الأول">
+					</div>
+					<div class="ca-field">
+						<label>المرفق 2 (اختياري)</label>
+						<input type="text" id="ca-attachment-2" placeholder="وصف المرفق أو رابط المستند الداعم الثاني">
+					</div>
+				</div>
+
+				<div class="ca-section-title"><span>✍️</span> التعهد والتوقيع</div>
+
+				<div class="ca-pledge-box">
+					<label class="ca-pledge-label">
+						<input type="checkbox" id="ca-pledge" required checked>
+						<span>ألتزم بصحة المعلومات الواردة في هذا الطلب وأتحمل المسؤولية القانونية والإدارية كافة وعليه أوقع.</span>
+					</label>
+				</div>
+
+				<div class="ca-field">
+					<label><span class="ca-required">*</span> توقيع مقدم الطلب (اكتب اسمك الصريح كتوقيع إلكتروني)</label>
+					<input type="text" id="ca-signature-name" placeholder="الاسم الرباعي للموقع" required>
+					<div class="ca-error-msg">يرجى إدخال توقيع مقدم الطلب</div>
+				</div>
+
+				<button type="submit" class="ca-submit-btn" id="ca-submit-btn">
+					<span class="ca-btn-text">إرسال واستخراج رقم الطلب</span>
+					<span class="ca-spinner"></span>
+				</button>
+			</form>
+		</div>
+
+		<!-- Success State -->
+		<div class="ca-card ca-success" id="ca-success-card">
+			<div class="ca-success-icon">✓</div>
+			<h2>تم تقديم طلبك بنجاح!</h2>
+			<p>تم تسجيل استمارة شؤون المواطنين الخاصة بك في نظام رئاسة جامعة تلعفر بشكل رسمي.<br>يرجى الاحتفاظ برقم الطلب أدناه لمتابعة حالة الطلب عند المراجعة أو عبر البريد الإلكتروني.</p>
+			<div class="ca-success-ref" id="ca-ref-number"></div>
+			<br>
+			<button class="ca-new-request-btn" id="ca-new-request-btn">
+				<span>📝</span> تقديم طلب جديد
+			</button>
+		</div>
+	</div>
+</div>
+
+<script>
+(function() {
+	const form = document.getElementById('ca-request-form');
+	const submitBtn = document.getElementById('ca-submit-btn');
+	const formCard = document.getElementById('ca-form-card');
+	const successCard = document.getElementById('ca-success-card');
+	const newRequestBtn = document.getElementById('ca-new-request-btn');
+	const refNumber = document.getElementById('ca-ref-number');
+	const fullNameInput = document.getElementById('ca-full-name');
+	const signatureInput = document.getElementById('ca-signature-name');
+
+	// Auto-fill signature with full name if empty or matching
+	fullNameInput.addEventListener('input', function() {
+		if (!signatureInput.value || signatureInput.dataset.autofilled === "true") {
+			signatureInput.value = fullNameInput.value;
+			signatureInput.dataset.autofilled = "true";
+		}
+	});
+	signatureInput.addEventListener('input', function() {
+		signatureInput.dataset.autofilled = "false";
+	});
+
+	// Remove error state on input
+	document.querySelectorAll('.ca-field input, .ca-field select, .ca-field textarea').forEach(el => {
+		el.addEventListener('input', () => {
+			el.closest('.ca-field').classList.remove('error');
+		});
+		el.addEventListener('change', () => {
+			el.closest('.ca-field').classList.remove('error');
+		});
+	});
+
+	function validateForm() {
+		let valid = true;
+
+		const fullName = document.getElementById('ca-full-name');
+		const addressArea = document.getElementById('ca-address-area');
+		const occupation = document.getElementById('ca-occupation');
+		const phone = document.getElementById('ca-phone');
+		const email = document.getElementById('ca-email');
+		const dept = document.getElementById('ca-department');
+		const subject = document.getElementById('ca-subject');
+		const details = document.getElementById('ca-details');
+		const pledge = document.getElementById('ca-pledge');
+		const signature = document.getElementById('ca-signature-name');
+
+		if (!fullName.value.trim()) { fullName.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!addressArea.value.trim()) { addressArea.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!occupation.value.trim()) { occupation.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!phone.value.trim()) { phone.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!email.value.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) { email.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!dept.value) { dept.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!subject.value.trim()) { subject.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!details.value.trim()) { details.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!signature.value.trim()) { signature.closest('.ca-field').classList.add('error'); valid = false; }
+		if (!pledge.checked) {
+			alert('يجب الموافقة على التعهد الإداري بصحة المعلومات قبل إرسال الطلب.');
+			valid = false;
+		}
+
+		return valid;
+	}
+
+	form.addEventListener('submit', async function(e) {
+		e.preventDefault();
+		if (!validateForm()) return;
+
+		submitBtn.classList.add('loading');
+		submitBtn.disabled = true;
+
+		try {
+			const response = await fetch('/api/method/uotelafer_leave_management.citizen_affairs.doctype.citizens_affairs_request.citizens_affairs_request.submit_citizen_request', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'X-Frappe-CSRF-Token': '{{ frappe.session.csrf_token }}'
+				},
+				body: JSON.stringify({
+					full_name: document.getElementById('ca-full-name').value.trim(),
+					address_area: document.getElementById('ca-address-area').value.trim(),
+					occupation: document.getElementById('ca-occupation').value.trim(),
+					target_department: document.getElementById('ca-department').value,
+					request_subject: document.getElementById('ca-subject').value.trim(),
+					request_details: document.getElementById('ca-details').value.trim(),
+					phone_number: document.getElementById('ca-phone').value.trim(),
+					email: document.getElementById('ca-email').value.trim(),
+					applicant_pledge: document.getElementById('ca-pledge').checked ? 1 : 0,
+					applicant_signature_name: document.getElementById('ca-signature-name').value.trim(),
+					attachment_1: document.getElementById('ca-attachment-1').value.trim(),
+					attachment_2: document.getElementById('ca-attachment-2').value.trim()
+				})
+			});
+
+			const data = await response.json();
+
+			if (data.message && data.message.success) {
+				refNumber.textContent = 'رقم الطلب الرسمي: ' + data.message.name;
+				formCard.style.display = 'none';
+				successCard.style.display = 'block';
+				window.scrollTo({ top: 0, behavior: 'smooth' });
+			} else {
+				let errMsg = 'حدث خطأ أثناء إرسال الطلب. يرجى المحاولة مرة أخرى.';
+				if (data._server_messages) {
+					try {
+						let msgs = JSON.parse(data._server_messages);
+						if (msgs.length > 0) {
+							let parsed = JSON.parse(msgs[0]);
+							errMsg = parsed.message || errMsg;
+						}
+					} catch(ex) {}
+				}
+				alert(errMsg);
+			}
+		} catch (error) {
+			alert('حدث خطأ في الاتصال بالسيرفر. يرجى المحاولة مرة أخرى.');
+			console.error(error);
+		} finally {
+			submitBtn.classList.remove('loading');
+			submitBtn.disabled = false;
+		}
+	});
+
+	newRequestBtn.addEventListener('click', function() {
+		form.reset();
+		document.querySelectorAll('.ca-field').forEach(f => f.classList.remove('error'));
+		successCard.style.display = 'none';
+		formCard.style.display = 'block';
+	});
+})();
+</script>
+{%- endblock -%}

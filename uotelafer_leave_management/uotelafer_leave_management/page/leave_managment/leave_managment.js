@@ -15,6 +15,7 @@ class LeaveManagementPage {
 		this.user_roles = {};
 		this.current_tab = 'my_leaves';
 		this.selected_leaves = [];
+		this.approval_level_names = {};
 
 		frappe.require('leave_managment.css', () => {
 			this.init();
@@ -22,9 +23,17 @@ class LeaveManagementPage {
 	}
 
 	async init() {
-		// Fetch roles
-		let r = await frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_user_roles" });
-		this.user_roles = r.message || {};
+		// Fetch roles and approval level names in parallel
+		let [roles_res, levels_res] = await Promise.all([
+			frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_user_roles" }),
+			frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_approval_level_names" })
+		]);
+		this.user_roles = roles_res.message || {};
+		let level_names = levels_res.message || [];
+		this.approval_level_names = {};
+		level_names.forEach(l => {
+			this.approval_level_names[l.level] = l.name;
+		});
 
 		this.user_fullname = frappe.session.user_fullname;
 		try {
@@ -58,19 +67,17 @@ class LeaveManagementPage {
 		let [dept_res, type_res, emp_res] = await Promise.all([
 			frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_departments" }),
 			frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_leave_types" }),
-			frappe.call({ method: "frappe.client.get_list", args: { doctype: "Leave Employee", fields: ["name", "full_name"], limit_page_length: 0 } })
+			frappe.call({ method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_leave_employees" })
 		]);
 		this.departments = dept_res.message || [];
 		this.leave_types = type_res.message || [];
 		this.leave_employees = emp_res.message || [];
 
 		// Determine default tab
-		if (this.user_roles.is_follow_up && !this.user_roles.is_employee && !this.user_roles.is_president && !this.user_roles.is_dept_head) {
+		if (this.user_roles.is_follow_up && !this.user_roles.is_employee && !this.user_roles.is_approver) {
 			this.current_tab = 'follow_up_leaves';
-		} else if (this.user_roles.is_president && !this.user_roles.is_employee) {
-			this.current_tab = 'president_leaves';
-		} else if (this.user_roles.is_dept_head && !this.user_roles.is_employee) {
-			this.current_tab = 'department_leaves';
+		} else if (this.user_roles.is_approver && !this.user_roles.is_employee) {
+			this.current_tab = 'pending_approval';
 		} else if (this.user_roles.is_proxy_submitter && !this.user_roles.is_employee) {
 			this.current_tab = 'proxy_leaves';
 		}
@@ -106,8 +113,7 @@ class LeaveManagementPage {
 				<div class="lm-tabs">
 					${this.user_roles.is_employee ? `<button class="lm-tab ${this.current_tab === 'my_leaves' ? 'active' : ''}" data-tab="my_leaves">إجازاتي</button>` : ''}
 					${this.user_roles.is_proxy_submitter ? `<button class="lm-tab ${this.current_tab === 'proxy_leaves' ? 'active' : ''}" data-tab="proxy_leaves">التقديم بالنيابة</button>` : ''}
-					${this.user_roles.is_dept_head || this.user_roles.is_admin ? `<button class="lm-tab ${this.current_tab === 'department_leaves' ? 'active' : ''}" data-tab="department_leaves">إجازات القسم</button>` : ''}
-					${this.user_roles.is_president || this.user_roles.is_admin ? `<button class="lm-tab ${this.current_tab === 'president_leaves' ? 'active' : ''}" data-tab="president_leaves">موافقات رئيس الجامعة</button>` : ''}
+					${this.user_roles.is_approver ? `<button class="lm-tab ${this.current_tab === 'pending_approval' ? 'active' : ''}" data-tab="pending_approval">بانتظار موافقتي</button>` : ''}
 					${this.user_roles.is_follow_up || this.user_roles.is_admin ? `<button class="lm-tab ${this.current_tab === 'follow_up_leaves' ? 'active' : ''}" data-tab="follow_up_leaves">متابعة الإجازات</button>` : ''}
 				</div>
 
@@ -150,8 +156,8 @@ class LeaveManagementPage {
 						<select id="filter-status">
 							<option value="All">الكل</option>
 							<option value="Pending">قيد الإنتظار</option>
-							<option value="Applied">مقدمة للرئيس المباشر</option>
-							<option value="Approved By Department">موافق عليها من القسم</option>
+							<option value="Applied">بانتظار الموافقة</option>
+							<option value="Approved By Department">موافقة جزئية</option>
 							<option value="Approved">مقبولة</option>
 							<option value="Rejected">مرفوضة</option>
 						</select>
@@ -164,7 +170,6 @@ class LeaveManagementPage {
 							<option value="Printed">مطبوعة</option>
 						</select>
 					</div>
-					<button class="lm-filter-btn" id="btn-filter">تحديث</button>
 					<button class="lm-filter-clear" id="btn-clear-filter">مسح</button>
 					</div>
 				</div>
@@ -182,7 +187,6 @@ class LeaveManagementPage {
 								<th>من تاريخ</th>
 								<th>الأيام</th>
 								<th>السبب</th>
-								<th>المرفقات</th>
 								<th>الحالة</th>
 								<th>القسم</th>
 								<th>الإجراءات</th>
@@ -210,8 +214,6 @@ class LeaveManagementPage {
 		}
 
 		this.bind_events();
-		
-		// Trigger initial tab view logic for filters
 		this.update_tab_ui();
 	}
 
@@ -229,20 +231,27 @@ class LeaveManagementPage {
 				<option value="">الكل (مقبولة ومقدمة)</option>
 			`);
 			status_val = "Approved";
+		} else if (this.current_tab === 'pending_approval') {
+			this.wrapper.find('#printed-filter-wrapper').hide();
+			this.wrapper.find('#btn-bulk-print').hide();
+			this.wrapper.find('#filter-status').html(`
+				<option value="All">بانتظار الموافقة</option>
+				<option value="Approved">مقبولة</option>
+				<option value="Rejected">مرفوضة</option>
+			`);
+			status_val = "All";
 		} else {
 			this.wrapper.find('#printed-filter-wrapper').hide();
 			this.wrapper.find('#btn-bulk-print').hide();
 			this.wrapper.find('#filter-status').html(`
 				<option value="All">الكل</option>
 				<option value="Pending">قيد الإنتظار</option>
-				<option value="Applied">مقدمة للرئيس المباشر</option>
-				<option value="Approved By Department">موافق عليها من القسم</option>
+				<option value="Applied">بانتظار الموافقة</option>
+				<option value="Approved By Department">موافقة جزئية</option>
 				<option value="Approved">مقبولة</option>
 				<option value="Rejected">مرفوضة</option>
 			`);
-			if (this.current_tab === 'department_leaves') status_val = "All";
-			else if (this.current_tab === 'president_leaves') status_val = "Approved By Department";
-			else status_val = "All";
+			status_val = "All";
 		}
 
 		this.wrapper.find('#filter-status').val(status_val);
@@ -274,7 +283,7 @@ class LeaveManagementPage {
 			this.show_balances_dialog();
 		});
 
-		this.wrapper.find('#btn-filter').on('click', () => {
+		this.wrapper.find('#filter-from-date, #filter-to-date, #filter-leave-type, #filter-status, #filter-dep, #filter-printed').on('change', () => {
 			this.load_data();
 		});
 
@@ -415,7 +424,7 @@ class LeaveManagementPage {
 		let emp_name = '';
 		if (emp_val) {
 			let matched = this.leave_employees ? this.leave_employees.find(d => (d.full_name || d.name) === emp_val) : null;
-			emp_name = matched ? matched.name : emp_val;
+			emp_name = matched ? (matched.user || matched.name) : emp_val;
 		}
 
 		return {
@@ -431,7 +440,7 @@ class LeaveManagementPage {
 
 	render_skeleton() {
 		let html = '';
-		let cols = this.current_tab === 'follow_up_leaves' ? 10 : 9;
+		let cols = this.current_tab === 'follow_up_leaves' ? 9 : 8;
 		for (let i = 0; i < 5; i++) {
 			html += `
 				<tr class="lm-skeleton-row">
@@ -443,7 +452,6 @@ class LeaveManagementPage {
 							<div class="lm-skeleton" style="flex:1"></div>
 							<div class="lm-skeleton" style="flex:0.5"></div>
 							<div class="lm-skeleton" style="flex:2"></div>
-							<div class="lm-skeleton" style="flex:1"></div>
 							<div class="lm-skeleton" style="flex:1.5"></div>
 							<div class="lm-skeleton" style="flex:1.5"></div>
 							<div class="lm-skeleton" style="flex:1"></div>
@@ -459,21 +467,21 @@ class LeaveManagementPage {
 		this.render_skeleton();
 
 		let method = '';
+		let args = this.get_filters();
+
 		if (this.current_tab === 'my_leaves') {
 			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_employee_leaves';
 		} else if (this.current_tab === 'proxy_leaves') {
 			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_proxy_leaves';
-		} else if (this.current_tab === 'department_leaves') {
-			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_department_leaves';
-		} else if (this.current_tab === 'president_leaves') {
-			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_president_leaves';
+		} else if (this.current_tab === 'pending_approval') {
+			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_pending_approval_leaves';
 		} else if (this.current_tab === 'follow_up_leaves') {
 			method = 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_all_leaves';
 		}
 
 		let r = await frappe.call({
 			method: method,
-			args: this.get_filters()
+			args: args
 		});
 
 		let data = r.message || [];
@@ -483,9 +491,9 @@ class LeaveManagementPage {
 
 	render_stats(data) {
 		let total = data.length;
-		let pending = data.filter(d => d.workflow_state === 'Pending' || d.workflow_state === 'Applied' || d.workflow_state === 'Approved By Department').length;
-		let approved = data.filter(d => d.workflow_state === 'Approved').length;
-		let rejected = data.filter(d => d.workflow_state === 'Rejected').length;
+		let pending = data.filter(d => d.status === 'Pending').length;
+		let approved = data.filter(d => d.status === 'Approved').length;
+		let rejected = data.filter(d => d.status === 'Rejected').length;
 
 		this.wrapper.find('#lm-stats-container').html(`
 			<div class="lm-stat-card total">
@@ -507,14 +515,33 @@ class LeaveManagementPage {
 		`);
 	}
 
-	get_status_html(state) {
+	get_status_html(row) {
+		let state = row.status;
 		let cls = '';
 		let label = state;
-		if (state === 'Pending') { cls = 'pending'; label = 'قيد الإنتظار'; }
-		else if (state === 'Applied') { cls = 'applied'; label = 'مقدمة للرئيس المباشر'; }
-		else if (state === 'Approved By Department') { cls = 'approved-dept'; label = 'موافق عليها من القسم'; }
-		else if (state === 'Approved') { cls = 'approved'; label = 'مقبولة'; }
-		else if (state === 'Rejected') { cls = 'rejected'; label = 'مرفوضة'; }
+		let current_level = row.current_approval_level || 0;
+		let next_level = row.next_approval_level;
+
+		if (state === 'Pending') {
+			cls = 'pending';
+			label = 'قيد الإنتظار';
+		} else if (state === 'Applied') {
+			cls = 'applied';
+			next_level = next_level || 1;
+			let level_name = this.approval_level_names[next_level] || `المستوى ${next_level}`;
+			label = `بانتظار ${level_name}`;
+		} else if (state === 'Approved By Department') {
+			cls = 'approved-dept';
+			next_level = next_level || (current_level + 1);
+			let level_name = this.approval_level_names[next_level] || `المستوى ${next_level}`;
+			label = `بانتظار ${level_name}`;
+		} else if (state === 'Approved') {
+			cls = 'approved';
+			label = 'مقبولة';
+		} else if (state === 'Rejected') {
+			cls = 'rejected';
+			label = 'مرفوضة';
+		}
 
 		return `<span class="lm-status ${cls}"><span class="status-dot"></span>${label}</span>`;
 	}
@@ -535,7 +562,6 @@ class LeaveManagementPage {
 			<th>من تاريخ</th>
 			<th>الأيام</th>
 			<th>السبب</th>
-			<th>المرفقات</th>
 			<th>الحالة</th>
 			<th>القسم</th>
 			<th>الإجراءات</th>
@@ -544,7 +570,7 @@ class LeaveManagementPage {
 		if (data.length === 0) {
 			tbody.html(`
 				<tr>
-					<td colspan="${this.current_tab === 'follow_up_leaves' ? 10 : 9}">
+					<td colspan="${this.current_tab === 'follow_up_leaves' ? 9 : 8}">
 						<div class="lm-empty">
 							<div class="empty-icon">📁</div>
 							<p>لا توجد بيانات لعرضها</p>
@@ -558,12 +584,10 @@ class LeaveManagementPage {
 		data.forEach(row => {
 			let reason_text = row.reason ? (row.reason.length > 30 ? row.reason.substring(0, 30) + '...' : row.reason) : '-';
 
-			let can_approve_dept = this.current_tab === 'department_leaves' && row.workflow_state === 'Applied';
-			let can_approve_pres = this.current_tab === 'president_leaves' && row.workflow_state === 'Approved By Department';
-			let needs_action = can_approve_dept || can_approve_pres;
-			let can_cancel = this.current_tab === 'my_leaves' && row.workflow_state === 'Approved' && row.to_date >= frappe.datetime.nowdate() && row.leave_type !== 'إلغاء إجازة';
-
-			let attachment_btn = row.attachment ? `<button class="lm-action-btn detail" onclick="window.open('${row.attachment}', 'Attachment', 'width=800,height=800'); return false;">عرض</button>` : '-';
+			// Determine if this row needs approval action from the current user
+			let can_approve = this.current_tab === 'pending_approval' && row.status === 'Pending';
+			let can_cancel = this.current_tab === 'my_leaves' && row.status === 'Approved' && row.to_date >= frappe.datetime.nowdate() && row.leave_type !== 'إلغاء إجازة';
+			let can_withdraw = (this.current_tab === 'my_leaves' || this.current_tab === 'proxy_leaves') && (row.status === 'Draft' || row.status === 'Pending');
 
 			let checkbox_td = '';
 			if (this.current_tab === 'follow_up_leaves') {
@@ -571,13 +595,23 @@ class LeaveManagementPage {
 				checkbox_td = `<td><input type="checkbox" class="chk-select-row" data-name="${row.name}" ${checked}></td>`;
 			}
 
-			let status_badges = this.get_status_html(row.workflow_state);
+			let status_badges = this.get_status_html(row);
 			if (row.printed) {
 				status_badges += ` <span class="lm-status printed"><span class="status-dot"></span>مطبوع</span>`;
 			}
 
+			let is_read = row.is_read ? 1 : 0;
+			let row_class = '';
+			let read_badge = '';
+			if (this.current_tab === 'follow_up_leaves') {
+				row_class = is_read ? 'lm-row-read' : 'lm-row-unread';
+				let read_btn_text = is_read ? 'مقروء' : 'غير مقروء';
+				let read_btn_class = is_read ? 'btn-read' : 'btn-unread';
+				read_badge = `<button class="lm-action-btn toggle-read ${read_btn_class}" data-name="${row.name}" data-read="${is_read}" style="margin-left: 5px; font-size: 11px; padding: 4px 8px;">${read_btn_text}</button>`;
+			}
+
 			let tr = $(`
-				<tr>
+				<tr class="${row_class}">
 					${checkbox_td}
 					<td><b>${row.employee_fullname || row.employee}</b></td>
 					<td>
@@ -587,13 +621,14 @@ class LeaveManagementPage {
 					<td>${row.from_date}</td>
 					<td><b>${row.is_time_leave ? (row.number_of_hours + ' ساعات') : row.days}</b></td>
 					<td style="max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${row.reason || ''}">${reason_text}</td>
-					<td>${attachment_btn}</td>
 					<td>${status_badges}</td>
 					<td>${row.dep || '-'}</td>
 					<td>
+							${read_badge}
 							<button class="lm-action-btn print-pdf" data-name="${row.name}" style="background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; margin-left: 5px;">طباعة</button>
-							<button class="lm-action-btn detail" data-name="${row.name}">${needs_action ? 'إجراء' : 'تفاصيل'}</button>
+							<button class="lm-action-btn detail" data-name="${row.name}">${can_approve ? 'إجراء' : 'تفاصيل'}</button>
 							${can_cancel ? `<button class="lm-action-btn stop-leave btn-warning" data-name="${row.name}" style="margin-right: 5px; background-color: #f59e0b; color: white; border: none;">قطع</button>` : ''}
+							${can_withdraw ? `<button class="lm-action-btn withdraw-leave btn-danger" data-name="${row.name}" style="margin-right: 5px; background-color: #ef4444; color: white; border: none;">سحب</button>` : ''}
 						</div>
 					</td>
 				</tr>
@@ -603,10 +638,45 @@ class LeaveManagementPage {
 				this.show_details_dialog(row);
 			});
 
+			if (this.current_tab === 'follow_up_leaves') {
+				tr.find('.toggle-read').on('click', (e) => {
+					e.stopPropagation();
+					let new_read = is_read ? 0 : 1;
+					frappe.call({
+						method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.toggle_leave_read',
+						args: { leave_name: row.name, is_read: new_read },
+						callback: (r) => {
+							if (!r.exc) {
+								this.load_data();
+							}
+						}
+					});
+				});
+			}
+
 			if (can_cancel) {
 				tr.find('.stop-leave').on('click', (e) => {
 					e.stopPropagation();
 					this.show_cancellation_dialog(row);
+				});
+			}
+
+			if (can_withdraw) {
+				tr.find('.withdraw-leave').on('click', (e) => {
+					e.stopPropagation();
+					frappe.confirm('هل أنت متأكد من سحب هذا الطلب؟ سيتم استرجاع الرصيد المخصوم تلقائياً.', () => {
+						frappe.call({
+							method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.withdraw_leave',
+							args: { leave_name: row.name },
+							freeze: true,
+							callback: (r) => {
+								if (!r.exc) {
+									frappe.show_alert({ message: 'تم سحب الإجازة بنجاح واسترجاع الرصيد', indicator: 'green' });
+									this.load_data();
+								}
+							}
+						});
+					});
 				});
 			}
 
@@ -672,6 +742,26 @@ class LeaveManagementPage {
 			}
 		};
 
+		let calculate_hours = () => {
+			if (!dialog) return;
+			let from_time = dialog.get_value('from_time');
+			let to_time = dialog.get_value('to_time');
+			if (from_time && to_time) {
+				let [h1, m1] = from_time.split(':').map(Number);
+				let [h2, m2] = to_time.split(':').map(Number);
+				let d1 = new Date(); d1.setHours(h1, m1, 0, 0);
+				let d2 = new Date(); d2.setHours(h2, m2, 0, 0);
+				let diff = (d2 - d1) / (1000 * 60 * 60);
+				if (diff > 0) {
+					dialog.set_value('number_of_hours', Math.round(diff));
+				} else {
+					dialog.set_value('number_of_hours', 0);
+				}
+			} else {
+				dialog.set_value('number_of_hours', 0);
+			}
+		};
+
 		let fields = [];
 		if (this.user_roles.is_proxy_submitter) {
 			fields.push(
@@ -687,7 +777,6 @@ class LeaveManagementPage {
 									dialog.set_value('employee_fullname', emp_doc.full_name);
 									dialog.set_value('dep', emp_doc.leave_department);
 									dialog.set_value('employee_user', emp_doc.user);
-									// Query last personal email
 									frappe.call({
 										method: "frappe.client.get_list",
 										args: {
@@ -735,17 +824,30 @@ class LeaveManagementPage {
 			{ fieldtype: 'Link', fieldname: 'dep', label: 'القسم', options: 'Leave Department', reqd: 1, default: this.last_dep },
 			{ fieldtype: 'Data', fieldname: 'personal_email', label: 'البريد الإلكتروني الشخصي', description: 'ايميل الاشعار', default: this.last_personal_email },
 			{ fieldtype: 'Column Break' },
-			{ fieldtype: 'Check', fieldname: 'is_time_leave', label: 'إجازة زمنية (بالساعات)', onchange: () => {
+			{ fieldtype: 'HTML', fieldname: 'time_leave_heading', options: '<div style="margin-bottom: 5px; font-weight: bold; color: var(--text-color); border-bottom: 1px solid var(--border-color); padding-bottom: 5px;">الإجازات الزمنية</div>' },
+			{ fieldtype: 'Check', fieldname: 'is_time_leave', label: '<span style="font-weight:bold; color:var(--text-color); font-size: 1.1em;">إجازة زمنية (بالساعات)</span>', onchange: () => {
 				let val = dialog.get_value('is_time_leave');
 				if (val) {
+					dialog.set_df_property('from_time', 'hidden', 0);
+					dialog.set_df_property('from_time', 'reqd', 1);
+					dialog.set_df_property('to_time', 'hidden', 0);
+					dialog.set_df_property('to_time', 'reqd', 1);
 					dialog.set_df_property('number_of_hours', 'hidden', 0);
 					dialog.set_df_property('number_of_hours', 'reqd', 1);
+					dialog.set_df_property('number_of_hours', 'read_only', 1);
 					dialog.set_df_property('to_date', 'hidden', 1);
 					dialog.set_df_property('to_date', 'reqd', 0);
 					dialog.get_field('days_display').$wrapper.hide();
 				} else {
+					dialog.set_df_property('from_time', 'hidden', 1);
+					dialog.set_df_property('from_time', 'reqd', 0);
+					dialog.set_value('from_time', '');
+					dialog.set_df_property('to_time', 'hidden', 1);
+					dialog.set_df_property('to_time', 'reqd', 0);
+					dialog.set_value('to_time', '');
 					dialog.set_df_property('number_of_hours', 'hidden', 1);
 					dialog.set_df_property('number_of_hours', 'reqd', 0);
+					dialog.set_df_property('number_of_hours', 'read_only', 0);
 					dialog.set_value('number_of_hours', 0);
 					dialog.set_df_property('to_date', 'hidden', 0);
 					dialog.set_df_property('to_date', 'reqd', 1);
@@ -753,6 +855,8 @@ class LeaveManagementPage {
 				}
 				update_days();
 			} },
+			{ fieldtype: 'Time', fieldname: 'from_time', label: 'من الوقت', hidden: 1, onchange: () => calculate_hours() },
+			{ fieldtype: 'Time', fieldname: 'to_time', label: 'إلى الوقت', hidden: 1, onchange: () => calculate_hours() },
 			{ fieldtype: 'Int', fieldname: 'number_of_hours', label: 'عدد الساعات', hidden: 1 },
 			{ fieldtype: 'Date', fieldname: 'from_date', label: 'من تاريخ', reqd: 1, default: frappe.datetime.add_days(frappe.datetime.nowdate(), 1), onchange: () => update_days() },
 			{ fieldtype: 'Date', fieldname: 'to_date', label: 'إلى تاريخ', reqd: 1, default: frappe.datetime.add_days(frappe.datetime.nowdate(), 1), onchange: () => update_days() },
@@ -780,6 +884,8 @@ class LeaveManagementPage {
 						to_date: values.is_time_leave ? values.from_date : values.to_date,
 						is_time_leave: values.is_time_leave ? 1 : 0,
 						number_of_hours: values.number_of_hours || 0,
+						from_time: values.from_time,
+						to_time: values.to_time,
 						reason: values.reason,
 						dep: values.dep,
 						alternative_employee: values.alternative_employee,
@@ -803,7 +909,7 @@ class LeaveManagementPage {
 			return {
 				filters: {
 					employee: emp,
-					workflow_state: 'Approved'
+					status: 'Approved'
 				}
 			};
 		};
@@ -902,9 +1008,7 @@ class LeaveManagementPage {
 	}
 
 	async show_details_dialog(row) {
-		let can_approve_dept = this.current_tab === 'department_leaves' && row.workflow_state === 'Applied';
-		let can_approve_pres = this.current_tab === 'president_leaves' && row.workflow_state === 'Approved By Department';
-		let needs_action = can_approve_dept || can_approve_pres;
+		let can_approve = this.current_tab === 'pending_approval' && row.status === 'Pending';
 
 		let r = await frappe.call({
 			method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_leave_comments',
@@ -912,7 +1016,61 @@ class LeaveManagementPage {
 		});
 		let comments = r.message || [];
 
+		let balance_html = '';
+		if (can_approve) {
+			let balance_r = await frappe.call({
+				method: 'uotelafer_leave_management.uotelafer_leave_management.doctype.leave.leave.get_leave_balance',
+				args: { employee: row.employee, leave_type: row.leave_type, current_leave_name: row.name }
+			});
+			let balance_before = balance_r.message ? balance_r.message.total_balance : 0;
+			let effective_leave_type = (balance_r.message && balance_r.message.effective_leave_type) || row.leave_type;
+			let days_to_deduct = row.is_time_leave ? (row.number_of_hours / 7.0) : row.days;
+			if (row.leave_type === 'إلغاء إجازة') {
+				days_to_deduct = -days_to_deduct;
+			}
+			let balance_after = balance_before - days_to_deduct;
+
+			balance_html = `
+				<div class="lm-detail-item full-width" style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+					<div class="detail-label" style="color: #166534; margin-bottom: 10px; font-weight: bold; text-align: center; border-bottom: 1px solid #bbf7d0; padding-bottom: 5px;">تأثير الإجازة على الرصيد (${effective_leave_type})</div>
+					<div style="display: flex; justify-content: space-around; text-align: center;">
+						<div>
+							<div style="font-size: 13px; color: #15803d; margin-bottom: 5px;">الرصيد قبل الموافقة</div>
+							<div style="font-weight: bold; font-size: 18px; color: #166534;">${balance_before.toFixed(2)} يوم</div>
+						</div>
+						<div>
+							<div style="font-size: 13px; color: #15803d; margin-bottom: 5px;">الرصيد بعد الموافقة</div>
+							<div style="font-weight: bold; font-size: 18px; color: ${balance_after < 0 ? '#dc2626' : '#166534'};" dir="ltr">${balance_after.toFixed(2)} يوم</div>
+						</div>
+					</div>
+				</div>
+			`;
+		}
+
+		// Build approval trail
+		let approval_trail_html = '';
+		let level_approvals = [];
+		try {
+			level_approvals = JSON.parse(row.level_approvals || '[]');
+		} catch (e) {}
+		if (level_approvals.length > 0) {
+			approval_trail_html = `
+				<div class="lm-detail-item full-width" style="background: #f0f9ff; border: 1px solid #bae6fd; padding: 12px; border-radius: 8px; margin-bottom: 10px;">
+					<div class="detail-label" style="color: #0369a1; margin-bottom: 8px; font-weight: bold;">سجل الموافقات</div>
+					${level_approvals.map(la => `
+						<div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #e0f2fe;">
+							<span style="color: #0c4a6e; font-weight: 600;">${la.level_name || 'المستوى ' + la.level}</span>
+							<span style="color: #0369a1;">${la.user_name}</span>
+							<span style="color: #64748b; font-size: 12px;">${la.date}</span>
+						</div>
+					`).join('')}
+				</div>
+			`;
+		}
+
 		let dialog_html = `
+			${balance_html}
+			${approval_trail_html}
 			<div class="lm-detail-grid">
 				<div class="lm-detail-item">
 					<div class="detail-label">الموظف</div>
@@ -945,7 +1103,7 @@ class LeaveManagementPage {
 				</div>
 				<div class="lm-detail-item full-width">
 					<div class="detail-label">الحالة الحالية</div>
-					<div class="detail-value" style="margin-top:5px;">${this.get_status_html(row.workflow_state)}</div>
+					<div class="detail-value" style="margin-top:5px;">${this.get_status_html(row)}</div>
 				</div>
 				<div class="lm-detail-item full-width">
 					<div class="detail-label">السبب</div>
@@ -972,7 +1130,7 @@ class LeaveManagementPage {
 					`).join('') : '<div style="color:var(--text-muted); font-size:13px;">لا توجد تعليقات</div>'}
 				</div>
 				
-				${needs_action ? `
+				${can_approve ? `
 					<div class="lm-field">
 						<label>إضافة ملاحظة (اختياري)</label>
 						<textarea id="action-comment" placeholder="اكتب ملاحظاتك هنا..."></textarea>
@@ -990,7 +1148,7 @@ class LeaveManagementPage {
 			fields: fields,
 		};
 
-		if (needs_action) {
+		if (can_approve) {
 			dialog_options.primary_action_label = 'موافقة';
 			dialog_options.primary_action = () => {
 				let comment = dialog.get_field('html_content').$wrapper.find('#action-comment').val();
@@ -1011,9 +1169,34 @@ class LeaveManagementPage {
 			window.open(url, '_blank');
 		});
 
-		if (needs_action) {
+		if (can_approve) {
 			dialog.get_primary_btn().removeClass('btn-primary').addClass('btn-success');
 			dialog.get_secondary_btn().removeClass('btn-default').addClass('btn-danger');
+
+			// Add "remove wrong department" action
+			dialog.add_custom_action('إلغاء لعدم الانتماء للقسم', () => {
+				frappe.confirm('هل أنت متأكد من إلغاء وحذف هذا الطلب لعدم انتماء الموظف للقسم؟', () => {
+					frappe.call({
+						method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.remove_wrong_department_leave',
+						args: { leave_name: row.name },
+						freeze: true,
+						callback: (r) => {
+							if (!r.exc) {
+								frappe.show_alert({ message: 'تم إلغاء وحذف الإجازة بنجاح', indicator: 'green' });
+								dialog.hide();
+								this.load_data();
+							}
+						}
+					});
+				});
+			});
+			setTimeout(() => {
+				dialog.$wrapper.find('.btn-custom').each(function() {
+					if ($(this).text().includes('إلغاء لعدم الانتماء للقسم')) {
+						$(this).removeClass('btn-default').addClass('btn-warning').css({'color': 'white', 'background-color': '#f59e0b', 'border': 'none'});
+					}
+				});
+			}, 10);
 		}
 
 		dialog.show();
@@ -1021,7 +1204,7 @@ class LeaveManagementPage {
 
 	apply_action(leave_name, action, comment, dialog) {
 		frappe.call({
-			method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.apply_workflow_action',
+			method: 'uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.process_leave_action',
 			args: {
 				leave_name: leave_name,
 				action: action,

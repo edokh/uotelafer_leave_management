@@ -1,0 +1,101 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-06-07 13:46:07.701435",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "hr_employee_role",
+  "approval_levels_section",
+  "approval_levels",
+  "approver_mappings_section",
+  "approver_mappings",
+  "department_visibility_section",
+  "department_visibility",
+  "citizen_affairs_section",
+  "citizens_affairs_admin_role"
+ ],
+ "fields": [
+  {
+   "fieldname": "hr_employee_role",
+   "fieldtype": "Link",
+   "label": "HR Employee Role",
+   "options": "Role"
+  },
+  {
+   "fieldname": "approval_levels_section",
+   "fieldtype": "Section Break",
+   "label": "Approval Levels"
+  },
+  {
+   "description": "Define approval levels in order. Each level can have a day-count range. Level 1 is the first approver, Level 2 the second, etc.",
+   "fieldname": "approval_levels",
+   "fieldtype": "Table",
+   "label": "Approval Levels",
+   "options": "Leave Approval Level",
+   "reqd": 1
+  },
+  {
+   "fieldname": "approver_mappings_section",
+   "fieldtype": "Section Break",
+   "label": "Approver Mappings"
+  },
+  {
+   "description": "Map users to the formations they can approve and at which level. A user can approve all departments in a formation at the same level.",
+   "fieldname": "approver_mappings",
+   "fieldtype": "Table",
+   "label": "Approver Mappings",
+   "options": "Leave Approver Mapping"
+  },
+  {
+   "fieldname": "department_visibility_section",
+   "fieldtype": "Section Break",
+   "label": "Formation Visibility (Follow Up / HR)"
+  },
+  {
+   "description": "Control which formations Follow Up and HR users can see. If a user has no entries here, they see ALL departments.",
+   "fieldname": "department_visibility",
+   "fieldtype": "Table",
+   "label": "Formation Visibility",
+   "options": "Leave Department Visibility"
+  },
+  {
+   "fieldname": "citizen_affairs_section",
+   "fieldtype": "Section Break",
+   "label": "Citizen Affairs Settings"
+  },
+  {
+   "description": "Role that can view all departments' citizen affairs requests",
+   "fieldname": "citizens_affairs_admin_role",
+   "fieldtype": "Link",
+   "label": "Citizens Affairs Admin Role",
+   "options": "Role"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-28 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Uotelafer Leave Management",
+ "name": "Leave Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

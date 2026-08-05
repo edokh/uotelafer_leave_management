@@ -8,15 +8,26 @@ from uotelafer_leave_management.uotelafer_leave_management.doctype.leave.leave i
 
 class TestLeave(FrappeTestCase):
 	def setUp(self):
+		# Create a test formation if it doesn't exist
+		if not frappe.db.exists("Leave Formation", "Test Formation"):
+			frappe.get_doc({
+				"doctype": "Leave Formation",
+				"formation_name": "Test Formation"
+			}).insert(ignore_permissions=True)
+
 		# Create a test department if it doesn't exist
 		if not frappe.db.exists("Leave Department", "Test Dept"):
 			self.dept = frappe.get_doc({
 				"doctype": "Leave Department",
 				"department_name": "Test Dept",
+				"formation": "Test Formation",
 				"department_head": "Administrator"
 			}).insert(ignore_permissions=True)
 		else:
 			self.dept = frappe.get_doc("Leave Department", "Test Dept")
+			if not self.dept.formation:
+				self.dept.formation = "Test Formation"
+				self.dept.save(ignore_permissions=True)
 
 		# Ensure "إلغاء إجازة" leave type exists
 		if not frappe.db.exists("Leave Type", "إلغاء إجازة"):
@@ -144,7 +155,7 @@ class TestLeave(FrappeTestCase):
 			"to_date": "2026-05-05",
 			"dep": "Test Dept",
 			"reason": "Original vacation",
-			"workflow_state": "Approved"
+			"status": "Approved"
 		})
 		self.insert_doc_without_workflow(orig_leave)
 		self.submit_doc_without_workflow(orig_leave)
@@ -212,7 +223,7 @@ class TestLeave(FrappeTestCase):
 			"to_date": "2026-05-05",
 			"dep": "Test Dept",
 			"reason": "Original vacation",
-			"workflow_state": "Approved"
+			"status": "Approved"
 		})
 		self.insert_doc_without_workflow(orig_leave)
 		self.submit_doc_without_workflow(orig_leave)
@@ -231,7 +242,7 @@ class TestLeave(FrappeTestCase):
 			"to_date": "2026-05-05",
 			"dep": "Test Dept",
 			"reason": "Stopping early",
-			"workflow_state": "Approved"
+			"status": "Approved"
 		})
 		self.insert_doc_without_workflow(cancel_leave)
 		self.assertEqual(cancel_leave.days, 3)
@@ -273,7 +284,7 @@ class TestLeave(FrappeTestCase):
 			"to_date": "2026-06-05",
 			"dep": "Test Dept",
 			"reason": "First leave",
-			"workflow_state": "Approved"
+			"status": "Approved"
 		})
 		self.insert_doc_without_workflow(leave1)
 		self.submit_doc_without_workflow(leave1)
@@ -300,7 +311,7 @@ class TestLeave(FrappeTestCase):
 			"to_date": "2026-06-05",
 			"dep": "Test Dept",
 			"reason": "Cancel latter half",
-			"workflow_state": "Approved"
+			"status": "Approved"
 		})
 		self.insert_doc_without_workflow(cancel)
 		self.submit_doc_without_workflow(cancel)
@@ -316,3 +327,218 @@ class TestLeave(FrappeTestCase):
 			"reason": "Leave in cancelled period"
 		})
 		self.insert_doc_without_workflow(leave2_valid) # Should succeed
+
+	def test_approval_recording(self):
+		"""Test that approval registers who and when approved the leave"""
+		leave = frappe.get_doc({
+			"doctype": "Leave",
+			"employee": "Administrator",
+			"leave_type": "اجازة اعتيادية",
+			"from_date": "2026-07-01",
+			"to_date": "2026-07-05",
+			"dep": "Test Dept",
+			"reason": "Testing approval logging"
+		})
+		self.insert_doc_without_workflow(leave)
+		leave.status = "Draft"
+		leave.save()
+
+		# Approve using apply_workflow_action (custom API page action)
+		from uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment import process_leave_action
+		
+		# Set session user to Administrator
+		frappe.set_user("Administrator")
+		
+		# Run workflow action
+		process_leave_action(leave.name, "Apply")
+		leave.reload()
+		for _ in range((leave.max_required_level or 1) + 1):
+			if leave.status == "Approved":
+				break
+			process_leave_action(leave.name, "Approve")
+			leave.reload()
+
+		# Reload document and verify
+		leave.reload()
+		self.assertEqual(leave.status, "Approved")
+		self.assertEqual(leave.approved_by, "Administrator")
+		self.assertEqual(leave.approved_by_name, frappe.db.get_value("User", "Administrator", "full_name"))
+		self.assertEqual(leave.approved_by_email, frappe.db.get_value("User", "Administrator", "email"))
+		self.assertIsNotNone(leave.approved_on)
+
+	def test_formation_level_routing_uses_sibling_department_mappings(self):
+		"""A leave should advance to the next formation level before final approval."""
+		from uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment import process_leave_action
+
+		if not frappe.db.exists("Leave Department", "Sibling Dept"):
+			frappe.get_doc({
+				"doctype": "Leave Department",
+				"department_name": "Sibling Dept",
+				"formation": "Test Formation",
+				"department_head": "Administrator"
+			}).insert(ignore_permissions=True)
+
+		settings = frappe.get_doc("Leave Settings")
+		original_levels = [
+			{
+				"level": row.level,
+				"level_name": row.level_name,
+				"min_days": row.min_days,
+				"max_days": row.max_days,
+				"role": row.role,
+			}
+			for row in (settings.approval_levels or [])
+		]
+		original_mappings = [
+			{
+				"user": row.user,
+				"formation": row.formation,
+				"approval_level": row.approval_level,
+			}
+			for row in (settings.approver_mappings or [])
+		]
+
+		try:
+			settings.set("approval_levels", [])
+			settings.append("approval_levels", {
+				"level": 1,
+				"level_name": "Supervisor",
+				"min_days": 0,
+				"max_days": 3,
+				"role": "System Manager",
+			})
+			settings.append("approval_levels", {
+				"level": 2,
+				"level_name": "President",
+				"min_days": 4,
+				"max_days": 0,
+				"role": "System Manager",
+			})
+
+			settings.set("approver_mappings", [])
+			settings.append("approver_mappings", {
+				"user": "Administrator",
+				"formation": "Test Formation",
+				"approval_level": 1,
+			})
+			settings.append("approver_mappings", {
+				"user": "Administrator",
+				"formation": "Test Formation",
+				"approval_level": 2,
+			})
+			settings.save(ignore_permissions=True)
+
+			leave = frappe.get_doc({
+				"doctype": "Leave",
+				"employee": "Administrator",
+				"leave_type": "اجازة اعتيادية",
+				"from_date": "2026-07-10",
+				"to_date": "2026-07-14",
+				"dep": "Test Dept",
+				"reason": "Formation routing test"
+			})
+			self.insert_doc_without_workflow(leave)
+			leave.status = "Draft"
+			leave.save(ignore_permissions=True)
+
+			frappe.set_user("Administrator")
+			process_leave_action(leave.name, "Apply")
+			process_leave_action(leave.name, "Approve")
+
+			leave.reload()
+			self.assertEqual(leave.status, "Pending")
+			self.assertEqual(leave.current_approval_level, 1)
+
+			process_leave_action(leave.name, "Approve")
+
+			leave.reload()
+			self.assertEqual(leave.status, "Approved")
+			self.assertEqual(leave.current_approval_level, 2)
+		finally:
+			settings.reload()
+			settings.set("approval_levels", [])
+			for row in original_levels:
+				settings.append("approval_levels", row)
+			settings.set("approver_mappings", [])
+			for row in original_mappings:
+				settings.append("approver_mappings", row)
+			settings.save(ignore_permissions=True)
+
+	def test_final_approval_without_next_level_keeps_workflow_valid(self):
+		"""If no next level exists, approval should still finalize without invalid transition errors."""
+		from uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment import process_leave_action
+
+		settings = frappe.get_doc("Leave Settings")
+		original_levels = [
+			{
+				"level": row.level,
+				"level_name": row.level_name,
+				"min_days": row.min_days,
+				"max_days": row.max_days,
+				"role": row.role,
+			}
+			for row in (settings.approval_levels or [])
+		]
+		original_mappings = [
+			{
+				"user": row.user,
+				"formation": row.formation,
+				"approval_level": row.approval_level,
+			}
+			for row in (settings.approver_mappings or [])
+		]
+
+		try:
+			settings.set("approval_levels", [])
+			settings.append("approval_levels", {
+				"level": 1,
+				"level_name": "Supervisor",
+				"min_days": 0,
+				"max_days": 3,
+				"role": "System Manager",
+			})
+			settings.append("approval_levels", {
+				"level": 2,
+				"level_name": "President",
+				"min_days": 4,
+				"max_days": 0,
+				"role": "System Manager",
+			})
+
+			settings.set("approver_mappings", [])
+			settings.append("approver_mappings", {
+				"user": "Administrator",
+				"formation": "Test Formation",
+				"approval_level": 1,
+			})
+			settings.save(ignore_permissions=True)
+
+			leave = frappe.get_doc({
+				"doctype": "Leave",
+				"employee": "Administrator",
+				"leave_type": "اجازة اعتيادية",
+				"from_date": "2026-07-20",
+				"to_date": "2026-07-25",
+				"dep": "Test Dept",
+				"reason": "No-next-level finalization test"
+			})
+			self.insert_doc_without_workflow(leave)
+			leave.status = "Draft"
+			leave.save(ignore_permissions=True)
+
+			frappe.set_user("Administrator")
+			process_leave_action(leave.name, "Apply")
+			process_leave_action(leave.name, "Approve")
+
+			leave.reload()
+			self.assertEqual(leave.status, "Approved")
+			self.assertEqual(leave.current_approval_level, 1)
+		finally:
+			settings.reload()
+			settings.set("approval_levels", [])
+			for row in original_levels:
+				settings.append("approval_levels", row)
+			settings.set("approver_mappings", [])
+			for row in original_mappings:
+				settings.append("approver_mappings", row)
+			settings.save(ignore_permissions=True)

@@ -2,8 +2,39 @@ import frappe
 from frappe.utils import today
 import json
 
+
+def _get_allowed_departments_for_user(user):
+    """Return visible departments for HR/Follow Up users; None means unrestricted."""
+    roles = frappe.get_roles(user)
+    if "System Manager" in roles:
+        return None
+
+    settings = frappe.get_cached_doc("Leave Settings")
+    formations = set()
+    for row in settings.department_visibility or []:
+        if row.user == user and row.formation:
+            formations.add(row.formation)
+
+    if not formations:
+        return None
+
+    visible_departments = frappe.get_all(
+        "Leave Department",
+        filters={"formation": ["in", list(formations)]},
+        pluck="name",
+    )
+
+    if not visible_departments:
+        return None
+
+    return sorted(set(visible_departments))
+
 @frappe.whitelist()
 def get_data(filters=None):
+    roles = frappe.get_roles(frappe.session.user)
+    if "System Manager" not in roles and "HR Employee" not in roles and "Follow Up Employee" not in roles:
+        frappe.throw("Access Denied")
+
     if isinstance(filters, str):
         filters = json.loads(filters)
     else:
@@ -12,7 +43,9 @@ def get_data(filters=None):
     user_filters = {"user_type": "System User"}
     if filters.get("user"):
         user_filters["name"] = filters.get("user")
-        
+
+    allowed_departments = _get_allowed_departments_for_user(frappe.session.user)
+
     # users
     users = frappe.get_all("User", filters=user_filters, fields=["name", "full_name", "first_name", "middle_name", "last_name", "email"], order_by="name asc")
     
@@ -29,7 +62,7 @@ def get_data(filters=None):
     user_names = [u.name for u in users]
     leave_employees = {}
     if user_names:
-        le_docs = frappe.get_all("Leave Employee", filters={"user": ["in", user_names]}, fields=["name", "user", "full_name", "leave_department"])
+        le_docs = frappe.get_all("Leave Employee", filters={"user": ["in", user_names]}, fields=["name", "user", "full_name", "leave_department", "type"])
         for le in le_docs:
             leave_employees[le.user] = le
             
@@ -56,6 +89,7 @@ def get_data(filters=None):
         p_name = profiles.get(u.email, "")
         le_name = leave_employees.get(u.name, {}).get("full_name", "")
         le_dept = leave_employees.get(u.name, {}).get("leave_department", "")
+        le_type = leave_employees.get(u.name, {}).get("type", "")
         
         # Apply python-side filters for joined fields
         if filters.get("profile_full_name") and filters.get("profile_full_name").lower() not in p_name.lower():
@@ -63,6 +97,14 @@ def get_data(filters=None):
         if filters.get("leave_employee_name") and filters.get("leave_employee_name").lower() not in le_name.lower():
             continue
         if filters.get("leave_department") and filters.get("leave_department") != le_dept:
+            continue
+        if filters.get("leave_employee_type") and filters.get("leave_employee_type") != le_type:
+            continue
+        if filters.get("no_balance") and int(filters.get("no_balance")):
+            if balances.get(u.name):  # has at least one leave type with a transaction
+                continue
+        # Formation access control: only show employees in allowed departments
+        if allowed_departments is not None and le_dept not in allowed_departments:
             continue
 
         row = {
@@ -74,6 +116,7 @@ def get_data(filters=None):
             "profile_full_name": p_name,
             "leave_employee_name": le_name,
             "leave_department": le_dept,
+            "leave_employee_type": le_type,
             "balances": balances.get(u.name, {})
         }
         data.append(row)
@@ -82,9 +125,13 @@ def get_data(filters=None):
         "users": data,
         "leave_types": [lt.name for lt in leave_types]
     }
-
+ 
 @frappe.whitelist()
-def save_user_row(user, leave_employee_name, leave_department, balances, first_name=None, middle_name=None, last_name=None):
+def save_user_row(user, leave_employee_name, leave_department, balances, first_name=None, middle_name=None, last_name=None, leave_employee_type=None):
+    roles = frappe.get_roles(frappe.session.user)
+    if "System Manager" not in roles and "HR Employee" not in roles:
+        frappe.throw("Access Denied")
+
     if isinstance(balances, str):
         balances = json.loads(balances)
         
@@ -92,6 +139,8 @@ def save_user_row(user, leave_employee_name, leave_department, balances, first_n
         leave_employee_name = ''
     if leave_department == 'null' or leave_department is None:
         leave_department = ''
+    if leave_employee_type == 'null' or leave_employee_type is None:
+        leave_employee_type = ''
         
     # Handle User Document fields
     user_doc = frappe.get_doc("User", user)
@@ -109,11 +158,11 @@ def save_user_row(user, leave_employee_name, leave_department, balances, first_n
     if user_changed:
         user_doc.flags.ignore_permissions = True
         user_doc.save(ignore_permissions=True)
-
-    if not leave_employee_name and leave_department:
-        # User specified department but no employee name. We default to User full name.
+ 
+    if not leave_employee_name and (leave_department or leave_employee_type):
+        # User specified department/type but no employee name. We default to User full name.
         leave_employee_name = frappe.get_value("User", user, "full_name") or user
-
+ 
     # Handle Leave Employee Document
     le = frappe.get_value("Leave Employee", {"user": user}, "name")
     if le:
@@ -128,16 +177,18 @@ def save_user_row(user, leave_employee_name, leave_department, balances, first_n
                 le = leave_employee_name
         
         frappe.db.set_value("Leave Employee", le, "leave_department", leave_department)
+        frappe.db.set_value("Leave Employee", le, "type", leave_employee_type)
     else:
         # Create new
-        if leave_employee_name or leave_department:
+        if leave_employee_name or leave_department or leave_employee_type:
             if not leave_employee_name:
-                frappe.throw("Leave Employee Name is required to save department.")
+                frappe.throw("Leave Employee Name is required to save.")
             doc = frappe.get_doc({
                 "doctype": "Leave Employee",
                 "user": user,
                 "full_name": leave_employee_name,
-                "leave_department": leave_department
+                "leave_department": leave_department,
+                "type": leave_employee_type
             })
             doc.insert(ignore_permissions=True)
 
@@ -178,3 +229,48 @@ def save_user_row(user, leave_employee_name, leave_department, balances, first_n
 
     frappe.db.commit()
     return "success"
+
+
+@frappe.whitelist()
+def get_accepted_leaves(filters=None):
+    roles = frappe.get_roles(frappe.session.user)
+    if "System Manager" not in roles and "HR Employee" not in roles and "Follow Up Employee" not in roles:
+        frappe.throw("Access Denied")
+
+    if isinstance(filters, str):
+        filters = json.loads(filters)
+    else:
+        filters = filters or {}
+
+    db_filters = {"status": "Approved"}
+
+    if filters.get("user"):
+        db_filters["employee"] = filters.get("user")
+    
+    if filters.get("leave_department"):
+        db_filters["dep"] = filters.get("leave_department")
+
+    allowed_departments = _get_allowed_departments_for_user(frappe.session.user)
+    if allowed_departments is not None:
+        if filters.get("leave_department"):
+            if filters.get("leave_department") not in allowed_departments:
+                return []
+        else:
+            db_filters["dep"] = ["in", allowed_departments]
+
+    leaves = frappe.get_all(
+        "Leave",
+        filters=db_filters,
+        fields=[
+            "name", "employee", "employee_fullname", "dep", "leave_type",
+            "from_date", "to_date", "days", "is_time_leave", "number_of_hours",
+            "approved_by", "approved_by_name", "approved_by_email", "approved_on"
+        ],
+        order_by="approved_on desc"
+    )
+
+    if filters.get("leave_employee_name"):
+        search_name = filters.get("leave_employee_name").lower()
+        leaves = [l for l in leaves if search_name in (l.employee_fullname or "").lower()]
+
+    return leaves

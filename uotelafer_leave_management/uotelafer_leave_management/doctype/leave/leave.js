@@ -23,6 +23,63 @@ frappe.ui.form.on("Leave", {
 		show_all_leave_balances(frm);
 	},
 
+	refresh(frm) {
+		if (!frm.is_new() && frm.doc.status === "Draft") {
+			frm.add_custom_button(__("Apply"), function() {
+				frappe.call({
+					method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.process_leave_action",
+					args: {
+						leave_name: frm.doc.name,
+						action: "Apply"
+					},
+					callback: function(r) {
+						if (!r.exc) {
+							frm.reload_doc();
+						}
+					}
+				});
+			}).addClass("btn-primary");
+		}
+		
+		if (!frm.is_new() && frm.doc.status === "Pending") {
+			frappe.call({
+				method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.get_pending_approval_leaves",
+				args: {},
+				callback: function(r) {
+					if (r.message && r.message.find(l => l.name === frm.doc.name)) {
+						frm.add_custom_button(__("Approve"), function() {
+							frappe.prompt([
+								{ fieldname: 'comment', fieldtype: 'Small Text', label: 'Comment' }
+							], function(values) {
+								frappe.call({
+									method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.process_leave_action",
+									args: { leave_name: frm.doc.name, action: "Approve", comment: values.comment },
+									callback: function(r) {
+										if (!r.exc) frm.reload_doc();
+									}
+								});
+							}, __("Approve Leave"), __("Approve"));
+						}).addClass("btn-success");
+						
+						frm.add_custom_button(__("Reject"), function() {
+							frappe.prompt([
+								{ fieldname: 'comment', fieldtype: 'Small Text', label: 'Comment' }
+							], function(values) {
+								frappe.call({
+									method: "uotelafer_leave_management.uotelafer_leave_management.page.leave_managment.leave_managment.process_leave_action",
+									args: { leave_name: frm.doc.name, action: "Reject", comment: values.comment },
+									callback: function(r) {
+										if (!r.exc) frm.reload_doc();
+									}
+								});
+							}, __("Reject Leave"), __("Reject"));
+						}).addClass("btn-danger");
+					}
+				}
+			});
+		}
+	},
+
 	dep(frm) {
 		// Clear alternative employee when dep changes
 		frm.set_value("alternative_employee", "");
